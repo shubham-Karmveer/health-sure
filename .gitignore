@@ -3,3 +3,23 @@
 _bmad-output
 _bmad
 FDE_Capstone_Solution_Submission_Template.pdf
+
+# Local frontend dependencies and build output
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+
+# Local backend build output
+backend/target/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+*.log

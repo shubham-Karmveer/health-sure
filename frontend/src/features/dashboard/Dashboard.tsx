@@ -11,6 +11,7 @@ import {
   signOut,
 } from "@/lib/api/healthdekho-api";
 import AvailableProducts from "@/features/products/AvailableProducts";
+import Recommendations from "@/features/recommendations/Recommendations";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -93,7 +94,10 @@ export default function Dashboard() {
 
             <div className="section-heading">
               <h2>Your policies</h2>
-              <span className="count">{dashboard.policies.length}</span>
+              <div className="section-actions">
+                <Link className="text-link" href="/policy">Find a policy by number</Link>
+                <span className="count">{dashboard.policies.length}</span>
+              </div>
             </div>
             {dashboard.policies.length === 0 ? (
               <div className="empty-state">
@@ -146,6 +150,10 @@ export default function Dashboard() {
             )}
           </section>
           <AvailableProducts onRegister={handleRegistration} />
+          <Recommendations
+            dateOfBirth={dashboard.customer.dateOfBirth}
+            onRegister={handleRegistration}
+          />
         </>
       ) : (
         <p className="muted">Redirecting to sign in…</p>

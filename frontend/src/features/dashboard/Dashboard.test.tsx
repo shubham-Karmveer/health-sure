@@ -74,6 +74,11 @@ describe("customer dashboard", () => {
       "href",
       "/policy?policyNumber=HD-POL-0001"
     );
+    expect(screen.getByRole("link", { name: "Find a policy by number" })).toHaveAttribute(
+      "href",
+      "/policy"
+    );
+    expect(screen.getByRole("heading", { name: "Get product recommendations" })).toBeVisible();
   });
 
   it("opens registration for the selected product in the current tab", async () => {

@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +35,9 @@ public class AiRecommendationRequest {
     @Column(name = "preferred_policy_type", length = 40)
     private String preferredPolicyType;
 
+    @Column(name = "date_of_birth", nullable = false)
+    private LocalDate dateOfBirth;
+
     @Column(name = "calculated_age", nullable = false)
     private int calculatedAge;
 
@@ -54,6 +58,7 @@ public class AiRecommendationRequest {
 
     public AiRecommendationRequest(
             Customer customer,
+            LocalDate dateOfBirth,
             String insuranceGoals,
             String preferredTerm,
             String preferredPolicyType,
@@ -63,6 +68,7 @@ public class AiRecommendationRequest {
             String promptVersion
     ) {
         this.customer = customer;
+        this.dateOfBirth = dateOfBirth;
         this.insuranceGoals = insuranceGoals;
         this.preferredTerm = preferredTerm;
         this.preferredPolicyType = preferredPolicyType;
@@ -91,6 +97,10 @@ public class AiRecommendationRequest {
 
     public String getPreferredPolicyType() {
         return preferredPolicyType;
+    }
+
+    public LocalDate getDateOfBirth() {
+        return dateOfBirth;
     }
 
     public int getCalculatedAge() {

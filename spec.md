@@ -136,7 +136,8 @@ Enforce `amount_paid > 0`, `amount_paid = premium_amount + penalty_amount`, and 
 | insurance_goals | nullable text | Customer preference |
 | preferred_term | nullable string | Customer preference |
 | preferred_policy_type | nullable string | Customer preference |
-| calculated_age | non-negative integer | Calculated from the customer's profile date of birth |
+| date_of_birth | date, not null | Verified match to the authenticated customer profile |
+| calculated_age | non-negative integer | Calculated from the authenticated customer's verified date of birth |
 | model_name, model_version, prompt_version | not null strings | Reproducibility/audit metadata |
 | requested_at | timestamp with time zone | Request timestamp |
 
@@ -196,7 +197,7 @@ All endpoints use JSON DTOs. The paths below are a proposed REST contract; namin
 }
 ```
 
-Accept one or more of date of birth, insurance goals/preferences, preferred term, and insurance type. Calculate age from the supplied date of birth using the Java Time API. If date of birth is omitted, use the authenticated customer's profile date of birth; do not allow a client-supplied customer identifier to select another customer's profile.
+Accept one or more of date of birth, insurance goals/preferences, preferred term, and insurance type. The UI pre-fills date of birth from the authenticated customer's profile. If omitted, use that profile value; if supplied, require it to match the profile. Calculate age from the verified date of birth using the Java Time API. Do not allow a client-supplied customer identifier to select another customer's profile.
 
 **Policy registration request**
 
@@ -269,8 +270,8 @@ The available-product response includes product code, policy name/type, term, su
 
 ### 5.3 Recommendations
 
-1. Load the authenticated customer. Accept the recommendation date of birth as an input; when it is omitted, use the authenticated customer's date of birth. Calculate age using Java Time API.
-2. Load active products and exclude products already held by the customer.
+1. Load the authenticated customer. Use the profile date of birth when the request omits it; otherwise require the submitted date to match the profile. Calculate age using Java Time API.
+2. Load active products, exclude products already held by the customer, and exclude products outside their configured entry-age limits.
 3. Provide the AI integration only the eligible product candidates and relevant preferences.
 4. Parse the model result into a typed internal response.
 5. Validate every returned product identifier against the candidate set; reject or safely omit invalid references and surface an integration error if the result cannot be trusted.

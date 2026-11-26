@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PolicyPayments from "@/features/payments/PolicyPayments";
+import PolicyNumberLookup from "@/features/payments/PolicyNumberLookup";
 
 export default function PolicyDetails() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function PolicyDetails() {
           onClose={() => router.push("/dashboard")}
         />
       ) : (
-        <p className="alert" role="alert">A policy identifier is required to view policy details.</p>
+        <PolicyNumberLookup />
       )}
     </main>
   );

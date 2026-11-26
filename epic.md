@@ -47,7 +47,7 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Goal:** Let a customer sign in locally and see only their own profile and policies.
 
-**FR alignment:** FR-1.
+**FR alignment:** Source FR-1; PRD FR-1.
 
 **Tasks**
 
@@ -74,7 +74,7 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Goal:** Let a signed-in customer discover eligible products and register a policy with a complete installment schedule.
 
-**FR alignment:** FR-2 and FR-4.
+**FR alignment:** Source FR-1 and FR-3; PRD FR-2 and FR-4.
 
 **Tasks**
 
@@ -103,7 +103,7 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Goal:** Let a customer review a policy schedule and record payments with consistent balances and transaction history.
 
-**FR alignment:** FR-5; depends on policy and installment data from Sprint 2.
+**FR alignment:** Source FR-4; PRD FR-5. Depends on policy and installment data from Sprint 2.
 
 **Tasks**
 
@@ -123,60 +123,86 @@ The target code layout and eventual AWS services are described in [architecture-
 - Payment history, installment statuses, and policy totals reconcile against persisted records.
 - The complete payment flow works locally using PostgreSQL.
 
-**Progress:** Complete. Authenticated customers can review their policy totals and installment schedule, record one or more manual payments, and view transaction history. Late payments assess a one-time 10% penalty on remaining principal; collected amounts are allocated to penalty before premium. Payment requests use customer-scoped idempotency keys and row locks.
+**Progress:** Payment schedule and processing are complete: authenticated customers can review policy totals and installments, record one or more manual payments, and view transaction history. Late payments assess a one-time 10% penalty on remaining principal; collected amounts are allocated to penalty before premium. Payment requests use customer-scoped idempotency keys and row locks. The source FR-4 policy-number entry/search form is a known UI gap and is scheduled as S4.8; policy access remains owner-scoped.
 
 **Verification:** `mvn -f backend/pom.xml test` passed (20 tests), including PostgreSQL-backed checks for ownership, on-time full and partial payments, late-payment penalty-first allocation, idempotent retries, conflicting key reuse, overpayment rejection, and no partial writes on rejected batches. Frontend tests passed (10 tests); lint, typecheck, and production build passed.
 
-## Sprint 4 — AI-assisted recommendations
+## Sprint 4 — Recommendations and discovery completion
 
-**Goal:** Show persisted, explainable recommendations that reference only eligible catalog products.
+**Goal:** Deliver the recommendation vertical slice and close the agreed product-discovery and policy-number lookup gaps, with local verification.
 
-**FR alignment:** FR-3.
+**FR alignment:** Source FR-2 / PRD FR-3 (recommendations); source FR-1 / PRD FR-2 plus the agreed marketplace-search addition (product discovery); source FR-4 / PRD FR-5 (policy-number lookup for payments). The multi-criteria customer policy search in source FR-5 / PRD FR-6 remains Sprint 5.
 
-**Prerequisites:** Local implementation and automated verification require no AWS account, API key, or Bedrock credentials because they use a deterministic provider stub. A manual Bedrock smoke test is optional and requires a selected model ID, a supported AWS region with model access enabled, and an AWS IAM identity with `bedrock:InvokeModel`. Use a local AWS profile/SSO session during development and an instance role after deployment; Bedrock does not use a separate API key. Add the Spring AI dependency and Bedrock adapter during S4.3; they are not yet present in the backend.
+**Prerequisites:** S4.1 recommendation storage is implemented. Local development and automated tests use a deterministic provider stub and require no AWS account or credentials. Optional Bedrock mode is configured with `AI_PROVIDER=bedrock`, `SPRING_AI_MODEL_CHAT=bedrock-converse`, `AWS_REGION`, and `BEDROCK_MODEL_ID`; use the AWS SDK credential chain (local profile/SSO for development and an Elastic Beanstalk instance role after deployment). Bedrock bearer API keys are not wired into this adapter. Keep all credentials out of source control and frontend configuration.
 
 **Tasks**
 
 - [x] S4.1 Add recommendation request/item migrations, entities, and repositories.
-- [ ] S4.2 Implement customer preference validation, age calculation, and eligible-candidate selection.
-- [ ] S4.3 Implement a recommendation provider interface, deterministic local test stub, and Bedrock adapter.
-- [ ] S4.4 Parse provider output into typed data and reject unknown, inactive, or ineligible product references.
-- [ ] S4.5 Implement `POST /api/recommendations` and `GET /api/recommendations/{requestId}` with metadata persistence.
-- [ ] S4.6 Build recommendation form/results and a handoff to the existing registration flow.
+- [x] S4.2 Validate recommendation inputs in the backend; prefill date of birth from the authenticated profile, reject a submitted mismatch, calculate age using Java Time, and select active, unowned products within configured entry-age limits.
+- [x] S4.3 Add the Spring AI dependency, provider configuration, a provider interface, and a deterministic local provider used by tests and default local development; implement the configurable Bedrock adapter.
+- [x] S4.4 Parse provider output into typed data, cap results at three, and validate every product against the eligible candidate set before persisting or returning it. Invalid/untrusted output and provider failure must produce explicit errors, never fabricated results.
+- [x] S4.5 Implement authenticated `POST /api/recommendations` and owner-scoped `GET /api/recommendations/{requestId}`; persist inputs, verified calculated age, model/prompt metadata, and validated recommendation items.
+- [x] S4.6 Build the dashboard recommendation entry point, input form, and tabular results with rationale, suitability, loading/error/empty states, and a same-tab registration handoff to the selected product.
+- [x] S4.7 Implement authenticated `GET /api/products/search` for active, not-already-owned offers by product code, policy name, or type; validate criteria and return bounded/paginated results. Present available products and search results in the source-required table, replacing the current card presentation.
+- [x] S4.8 Add a policy-number input/search state to the payment flow and connect it to the existing owner-scoped policy detail endpoint. Display payment details only for the authenticated customer's policy.
+- [x] S4.9 Add focused backend and frontend tests for DOB validation, candidate eligibility, provider errors/untrusted output, persistence/ownership, product search filters/pagination, policy lookup ownership, and registration handoff.
+- [x] S4.10 Run backend tests and PostgreSQL integration tests, frontend tests/lint/typecheck/build, and local smoke flows for recommendations, product search, policy lookup, and registration.
+
+**Execution order:** Complete S4.2 before candidate generation; complete S4.3–S4.5 for the recommendation service and API before S4.6 UI integration. S4.7 product search and S4.8 policy-number lookup are separate vertical slices and may proceed independently. Add focused tests with each slice, then finish with S4.9–S4.10.
 
 **Exit verification**
 
 - Model candidates contain only eligible products from the database.
-- Invalid product references are not displayed or persisted as recommendation items.
+- A submitted date of birth that differs from the authenticated customer's profile is rejected; candidates exclude inactive, already-owned, and age-ineligible products.
+- Invalid product references are not displayed or persisted as recommendation items; at most three validated recommendations are returned.
 - Request inputs, calculated age, model/prompt metadata, and validated items persist and can be retrieved.
 - Automated recommendation tests pass with a deterministic local stub and no AWS credentials.
 - Provider timeout/failure returns an explicit error and never fabricates a successful response.
-- When explicitly configured with valid local AWS credentials, a manual Bedrock smoke test can be run; it is not a CI or local startup requirement.
+- Product search supports code/name/type, returns only available active products, and is bounded or paginated; available products and results use the source-required tabular presentation.
+- The payment flow supports policy-number lookup and never reveals another customer's policy.
+- Backend, frontend, PostgreSQL integration, and local smoke checks pass. A live Bedrock smoke test is optional and is not a CI or local-startup requirement.
 
-**Progress:** S4.1 data-model foundation was implemented during pre-Sprint-4 requirement alignment: PostgreSQL tables, audit and lookup indexes, JPA entities, and repositories are present. Recommendation generation, provider integration, endpoints, and UI remain pending.
+**Progress:** S4.1–S4.9 are implemented. PostgreSQL-backed backend tests (30 total), frontend tests (19 total), lint, typecheck, production build, and frontend HTTP smoke check passed. S4.10 remains open: the frontend smoke check passed, but the backend listener was unavailable for local end-to-end API flows; endpoint behavior is covered by the PostgreSQL-backed integration tests. A live Bedrock call was not attempted; it remains optional and requires model access and credentials.
 
-## Sprint 5 — Policy search and local end-to-end verification
+## Sprint 5 — Customer policy search and end-to-end verification
 
-**Goal:** Complete supported customer policy search and verify all current-release user journeys locally.
+**Goal:** Implement the source brief's multi-criteria customer-owned policy search and verify all current-release user journeys locally.
 
-**FR alignment:** FR-6 plus regression verification for FR-1 through FR-5.
+**FR alignment:** Source FR-5 / PRD FR-6 (own-policy search), plus regression verification for source FR-1 through FR-4. Marketplace product search is delivered in Sprint 4 and is not part of this search scope.
+
+**Planning notes:** The search contract in `spec.md` defines the supported criteria but does not define whether customer-name matching is exact or partial/case-insensitive. Resolve and record this before implementing the search query. The latest full backend test run also exposed PostgreSQL integration assertions that count rows across a shared database; establish a repeatable, non-destructive test baseline before using the full suite as a release gate.
 
 **Tasks**
 
-- [ ] S5.1 Implement marketplace product-offer search and authenticated-customer-owned policy search with database-backed queries, validation, and pagination. Own-policy criteria must support policy identifier, customer name, and policy identifier plus date of birth, without exposing other customers' records.
-- [ ] S5.2 Build search form, paginated results, error display, and no-results state.
-- [ ] S5.3 Add tests for each supported search mode and confirm unauthorized records are never returned.
-- [ ] S5.4 Run backend unit/service/controller tests, PostgreSQL integration tests, and frontend tests.
-- [ ] S5.5 Run local end-to-end flows for sign-in, dashboard, discovery, registration, recommendations, payments, and search.
-- [ ] S5.6 Fix local integration issues and document the commands required to run the application and tests.
+- [ ] S5.1 Resolve and record customer-name matching semantics in `spec.md`; make PostgreSQL integration fixtures and assertions repeatable without truncating or deleting shared developer data.
+- [ ] S5.2 Implement authenticated `GET /api/policies/search` with validated query parameters and page/size handling. Support only the source-brief modes: policy identifier; customer name; policy identifier plus date of birth. Reject blank or unsupported criteria combinations. Derive the customer ID exclusively from the authenticated principal.
+- [ ] S5.3 Add efficient customer-scoped repository/service queries and response DTOs. Return `PageResponse` metadata and policy identifier, customer name, date of birth, policy name/type, start/maturity dates, total premium payable, payment status, total premium paid, and remaining premium. Keep totals consistent with the existing payment-detail calculations and avoid per-row follow-up queries.
+- [ ] S5.4 Add the customer policy-search form to the signed-in experience, with policy identifier, customer name, and date-of-birth inputs; connect it to the API client and display paginated table results, validation errors, loading state, and an explicit no-results state.
+- [ ] S5.5 Add focused repository/service/controller and frontend tests for all supported criteria modes, unsupported/empty criteria, normalization, pagination and page-size bounds, response fields, and cross-customer isolation.
+- [ ] S5.6 Run local end-to-end flows for sign-in, dashboard, product search, registration, recommendations, policy-number lookup, payments, and multi-criteria policy search. Verify search results do not expose another customer's data.
+- [ ] S5.7 Run the backend suite against an isolated/repeatable PostgreSQL test setup, frontend tests, lint, typecheck, and production build; fix integration issues and update local run/test instructions.
+
+**Search acceptance matrix**
+
+| Input criteria | Expected behavior |
+|---|---|
+| Policy identifier | Return exact matching policy records owned by the authenticated customer |
+| Customer name | Apply the agreed name-matching rule and return only the authenticated customer's matching policies |
+| Policy identifier and date of birth | Require both values to match, while still restricting results to the authenticated customer |
+| Empty input, date of birth alone, or unsupported combinations | Return a clear validation error |
+| No matching owned policy | Return an empty page and show a clear no-results message |
 
 **Exit verification**
 
 - Each supported search mode returns only matching, authorized policies.
 - Invalid/insufficient criteria are rejected and large results are bounded or paginated.
+- The result table includes all policy, customer, date, and payment fields required by source FR-5, with totals consistent with the payment view.
+- Pagination is bounded consistently with the existing product-search API, and repeated test runs do not rely on or destroy shared database state.
 - All current-release user journeys pass locally against PostgreSQL.
 - Frontend build, backend build, automated tests, and clean-start smoke checks pass.
 - No AWS deployment or production readiness claim is made by this sprint.
+
+**Execution order:** Resolve the name-matching rule and stabilize the PostgreSQL test baseline in S5.1. Complete the authenticated API and owner-scoped query in S5.2–S5.3 before building the UI in S5.4. Add focused tests with each layer, then complete the search acceptance matrix and full regression flow in S5.5–S5.7.
 
 ## Definition of Done — Every Sprint
 
@@ -193,12 +219,13 @@ The target code layout and eventual AWS services are described in [architecture-
 
 | PRD requirement | Sprint | Completion evidence |
 |---|---:|---|
-| FR-1 Authentication and customer dashboard | 1 | Completed: JWT-cookie auth, own-customer profile/policy APIs, seed, and UI/API verification |
-| FR-2 Product discovery and registration entry point | 2 | Completed: seeded catalog filtering, registration entry point, and UI/API tests |
-| FR-3 AI-assisted recommendations | 4 | Candidate validation, metadata persistence, provider failure, and UI tests |
-| FR-4 Policy registration | 2 | Completed: age/date validation, transactional schedule generation, uniqueness, and UI/API tests |
-| FR-5 Premium schedule and payment management | 2–3 | Schedule, penalty, partial payment, idempotency, ownership, and transaction tests |
-| FR-6 Marketplace product and own-policy search | 5 | Active offer filters, own-policy authorization, pagination, and UI tests |
+| FR-1 Authentication and customer dashboard (source FR-1) | 1 | Completed: JWT-cookie auth, own-customer profile/policy APIs, seed, and UI/API verification |
+| FR-2 Product discovery and registration entry point (source FR-1) | 2, 4 | Core catalog/registration implemented in S2; S4 aligns the offer table and adds active product search |
+| FR-3 AI-assisted recommendations (source FR-2) | 4 | Candidate eligibility, verified DOB, metadata persistence, provider failure handling, and UI tests |
+| FR-4 Policy registration (source FR-3) | 2 | Completed: age/date validation, transactional schedule generation, uniqueness, and UI/API tests |
+| FR-5 Premium schedule and payment management (source FR-4) | 2–4 | Payment core implemented in S3; S4 adds the source-required policy-number lookup UI |
+| FR-6 Customer insurance policy search (source FR-5) | 5 | Source search modes, own-customer authorization, pagination, result table, and UI tests |
+| Agreed marketplace product search (addition to source FR-1 discovery) | 4 | Active, available-offer filters by code/name/type, bounded results, and table UI |
 | Local build, testing, and developer setup | 0–5 | Clean local start/build/test verification |
 
 ## Deferred: AWS Production Readiness

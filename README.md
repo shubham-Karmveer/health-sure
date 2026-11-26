@@ -47,18 +47,21 @@ The sample catalog is intended only for local development. Disable it explicitly
 
 ## Sprint 4 Bedrock access
 
-The recommendation interface, validation, and automated tests can be developed with a deterministic local provider stub; they do not require AWS credentials or an API key. The backend does not yet include Spring AI or a Bedrock adapter; that dependency is added as part of Sprint 4.
+Local development and automated tests use a deterministic provider stub by default and do not require AWS credentials or model access. The Bedrock recommendation provider calls Converse with native JSON Schema structured output, while continuing to validate every returned product against the eligible catalog.
 
-For an optional live Bedrock smoke test, prepare:
+For an optional live Bedrock smoke test, set these backend environment variables in the backend process:
 
-- An AWS account and region where the selected Bedrock model is available, with model access enabled.
-- The selected Bedrock model ID.
-- An AWS identity allowed to invoke that model (`bedrock:InvokeModel`).
-- Local AWS SSO/profile credentials, or an Elastic Beanstalk instance role for a deployed environment.
+```powershell
+$env:AI_PROVIDER = "bedrock"
+$env:AWS_REGION = "us-east-1"
+$env:BEDROCK_MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+$env:BEDROCK_MAX_TOKENS = "1024"
+mvn -f backend/pom.xml spring-boot:run
+```
 
-Amazon Bedrock uses AWS IAM credentials rather than a separate Bedrock API key. Do not commit access keys or place them in frontend configuration. The production deployment remains deferred.
+The example model ID uses US cross-region inference routing. Confirm the inference profile is available in your source region, submit Anthropic's one-time use-case form if prompted, and grant `bedrock:InvokeModel` for both the inference profile and its foundation model ARN. The first call with the schema may take up to 90 seconds while Bedrock compiles it. The provider uses the AWS SDK credential chain: use a local AWS profile/SSO session for development and an Elastic Beanstalk instance role after deployment. It does not configure Bedrock bearer API keys. Never place credentials in source control or frontend configuration. The production deployment remains deferred.
 
-Signed-in customers can open a policy's payment view to review installments, record manual payments, and see payment history. Payment recording is local-only accounting; it does not connect to a payment gateway.
+Signed-in customers can search active available products by code, name, or type; request catalog-grounded recommendations; open their own policies by policy number; review installments; record manual payments; and see payment history. Payment recording is local-only accounting; it does not connect to a payment gateway.
 
 ## Run the frontend
 

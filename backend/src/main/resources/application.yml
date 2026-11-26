@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: healthdekho-api
+  ai:
+    model:
+      chat: ${SPRING_AI_MODEL_CHAT:none}
+    bedrock:
+      aws:
+        region: ${AWS_REGION:us-east-1}
+      converse:
+        chat:
+          options:
+            model: ${BEDROCK_MODEL_ID:us.anthropic.claude-haiku-4-5-20251001-v1:0}
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/healthdekho}
     username: ${DATABASE_USERNAME:healthdekho_dev}
@@ -43,3 +53,12 @@ app:
       password: ${SEED_CUSTOMER_PASSWORD:}
     catalog:
       enabled: ${SEED_CATALOG_ENABLED:true}
+  ai:
+    provider: ${AI_PROVIDER:stub}
+    model-name: ${AI_MODEL_NAME:healthdekho-local-stub}
+    model-version: ${AI_MODEL_VERSION:v1}
+    prompt-version: ${AI_PROMPT_VERSION:recommendations-v1}
+    bedrock:
+      model-name: ${BEDROCK_MODEL_ID:us.anthropic.claude-haiku-4-5-20251001-v1:0}
+      max-tokens: ${BEDROCK_MAX_TOKENS:1024}
+      temperature: ${BEDROCK_TEMPERATURE:0.1}

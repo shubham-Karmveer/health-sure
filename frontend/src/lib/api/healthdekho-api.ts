@@ -40,6 +40,57 @@ export interface AvailableProduct {
   maxEntryAge: number;
 }
 
+export interface SearchFilters {
+  productCode: string;
+  policyName: string;
+  policyType: string;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
+
+export interface RecommendationRequest {
+  dateOfBirth: string;
+  insuranceGoals?: string;
+  preferredTerm?: string;
+  preferredPolicyType?: string;
+}
+
+export interface RecommendationItem {
+  productId: string;
+  productCode: string;
+  policyName: string;
+  policyType: string;
+  termMonths: number;
+  premiumFrequency: string;
+  premiumAmount: number;
+  sumInsured: number;
+  rankOrder: number;
+  recommendationReason: string;
+  suitability: string;
+  selectedForRegistration: boolean;
+}
+
+export interface RecommendationResult {
+  requestId: string;
+  dateOfBirth: string;
+  calculatedAge: number;
+  insuranceGoals: string | null;
+  preferredTerm: string | null;
+  preferredPolicyType: string | null;
+  modelName: string;
+  modelVersion: string;
+  promptVersion: string;
+  requestedAt: string;
+  recommendations: RecommendationItem[];
+}
+
 export interface PolicyRegistrationResult {
   policyNumber: string;
   confirmation: string;
@@ -142,6 +193,38 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
 export async function fetchAvailableProducts(): Promise<AvailableProduct[]> {
   const response = await apiClient.get<AvailableProduct[]>("/api/products/available");
+  return response.data;
+}
+
+export async function searchAvailableProducts(
+  filters: SearchFilters,
+  page = 0,
+  size = 20
+): Promise<PageResponse<AvailableProduct>> {
+  const response = await apiClient.get<PageResponse<AvailableProduct>>("/api/products/search", {
+    params: {
+      productCode: filters.productCode.trim() || undefined,
+      policyName: filters.policyName.trim() || undefined,
+      policyType: filters.policyType.trim() || undefined,
+      page,
+      size,
+    },
+  });
+  return response.data;
+}
+
+export async function createRecommendation(
+  request: RecommendationRequest
+): Promise<RecommendationResult> {
+  await prepareCsrfToken();
+  const response = await apiClient.post<RecommendationResult>("/api/recommendations", request);
+  return response.data;
+}
+
+export async function fetchRecommendation(requestId: string): Promise<RecommendationResult> {
+  const response = await apiClient.get<RecommendationResult>(
+    `/api/recommendations/${encodeURIComponent(requestId)}`
+  );
   return response.data;
 }
 

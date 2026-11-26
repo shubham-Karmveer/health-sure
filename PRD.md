@@ -69,16 +69,16 @@ No separate operations-user workflow is defined for the current release. Such a 
 
 ### 6.3 Request recommendations
 
-1. Customer provides one or more supported preferences: insurance goals, preferred term, and insurance type. Date of birth is taken from customer details.
-2. The system calculates age, loads active products, and excludes products already registered.
+1. Customer provides one or more supported inputs: date of birth, insurance goals/preferences, preferred term, and insurance type. The date-of-birth field is prefilled from the authenticated customer profile.
+2. The server verifies any submitted date of birth against the authenticated customer's profile, calculates age, loads active products, excludes products already registered, and applies configured product entry-age limits.
 3. The AI generates recommendations grounded only in this eligible product set.
 4. Recommendations and request/model metadata are persisted and displayed with rationale and suitability.
 5. Customer can start registration for a recommended product.
 
 ### 6.4 Review a policy and record a payment
 
-1. Customer searches for a policy by its unique identifier.
-2. The application displays policy totals and its installment schedule.
+1. An authenticated customer searches for one of their policies by its unique identifier.
+2. The application displays policy totals and its installment schedule only if the policy belongs to that customer.
 3. Customer selects eligible installments and submits payment amounts.
 4. The system validates amounts, applies any applicable late penalty, records transaction details, and updates installment and policy balances atomically.
 5. The updated payment history and status are displayed.
@@ -86,9 +86,11 @@ No separate operations-user workflow is defined for the current release. Such a 
 ### 6.5 Search marketplace products and customer policies
 
 1. Customer searches active product offers by product code, policy name, or policy type.
-2. Customer can separately search policy records belonging to their authenticated account by policy number or product name/type.
+2. Customer can separately search policy records belonging to their authenticated account by policy identifier, customer name, or policy identifier and date of birth, matching the source brief's search modes.
 3. The application validates criteria and returns matching results in a bounded or paginated result set.
 4. If there are no matches, the application shows a clear no-results message. Search never returns another customer's policy/payment data.
+
+Marketplace product search is an agreed product-discovery addition; it is separate from the source brief's FR-5 customer policy search.
 
 ## 7. Functional requirements and acceptance criteria
 
@@ -99,7 +101,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 | FR-1: Customer dashboard, available products, and registration entry point | FR-1 and FR-2 |
 | FR-2: AI-assisted recommendations | FR-3 |
 | FR-3: Policy registration | FR-4 |
-| FR-4: Premium payment management | FR-5 |
+| FR-4: Premium payment management, including lookup by unique policy identifier | FR-5 |
 | FR-5: Customer insurance policy search | FR-6 |
 
 ### FR-1: Authentication and customer dashboard
@@ -108,7 +110,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 - Store a 30-minute JWT in an HttpOnly cookie; do not expose it to browser JavaScript or local storage. After expiry, the customer signs in again.
 - Invalid credentials produce an appropriate error; successful authentication routes to the dashboard.
 - Dashboard data is scoped to the authenticated customer.
-- Display each registered policy’s identifier, name, type, term, start and maturity dates, premium frequency and amount, sum insured, and status.
+- Display the authenticated customer's policies in a table with identifier, name, type, term, start and maturity dates, premium frequency and amount, sum insured, and status.
 - Show an empty state when the customer has no policies.
 
 **Acceptance criteria**
@@ -122,7 +124,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 ### FR-2: Product discovery and registration entry point
 
 - List active products and exclude products for which the customer already has a registered policy.
-- Show product code, name, type, term, sum insured, premium frequency, premium amount, and a registration action.
+- Show available products in a table with product code, name, type, term, sum insured, premium frequency, premium amount, and a registration action.
 - Selecting **Register** opens registration with the selected product pre-populated.
 - The defined duplicate-registration rule is one policy per customer per product.
 
@@ -134,10 +136,10 @@ No separate operations-user workflow is defined for the current release. Such a 
 
 ### FR-3: AI-assisted recommendations
 
-- Collect one or more supported preference inputs: insurance goals, preferred policy term, and insurance type. Use the customer’s date of birth to calculate age with the Java Time API.
-- Retrieve active products and exclude products already held by the customer before requesting recommendations.
+- Collect one or more supported inputs: date of birth, insurance goals/preferences, preferred policy term, and insurance type. Prefill date of birth from the authenticated customer profile; reject a submitted date of birth that differs from that profile. Calculate age with the Java Time API.
+- Retrieve active products, exclude products already held by the customer, and exclude products outside their configured entry-age limits before requesting recommendations.
 - Recommendations must reference only products in the retrieved eligible catalog.
-- Show product code, name, type, term, sum insured, frequency, premium, recommendation reason, suitability, and registration action.
+- Show up to three recommendations in a table with product code, name, type, term, sum insured, frequency, premium, recommendation reason, suitability, and registration action.
 - Persist each recommendation request, its inputs, calculated age, model/prompt metadata, and returned recommendation items.
 - Selecting **Register** opens registration with the recommended product pre-populated.
 - AI output does not replace deterministic eligibility, registration, or financial validation.
@@ -145,6 +147,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 **Acceptance criteria**
 
 - A recommendation cannot contain an unknown, inactive, or already-registered product.
+- A submitted date of birth that does not match the authenticated customer's profile is rejected; product candidates respect configured entry-age limits.
 - A recommendation request and its items remain available in persistent storage with the metadata described in the data model.
 - Every displayed recommendation includes its rationale and suitability.
 - Registration from a recommendation follows the same validation rules as registration from product discovery.
@@ -169,7 +172,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 
 ### FR-5: Premium schedule and payment management
 
-- Search for a policy by its unique policy identifier and display customer name, policy name, term, dates, total payable, total paid, and remaining amount.
+- Provide a policy-number lookup in the payment interface. Search by the unique policy identifier and display details only when the policy belongs to the authenticated customer: customer name, policy name, term, dates, total payable, total paid, and remaining amount.
 - Display installment number, scheduled amount, due date, grace-period end date, status, and selection for eligible pending installments.
 - Support one or multiple selected installments and partial payments where applicable.
 - Record payment date, unique transaction reference, amount, penalty, payment method, and transaction history.
@@ -190,15 +193,16 @@ No separate operations-user workflow is defined for the current release. Such a 
 ### FR-6: Marketplace product and own-policy search
 
 - Search active marketplace offers by product code, policy name, or policy type.
-- Separately search policy records owned by the authenticated customer using policy identifier, customer name, or policy identifier with date of birth, as defined in the source brief. Product name/type may also be used as filters where supported.
+- Separately search policy records owned by the authenticated customer using the source-brief criteria: policy identifier, customer name, or policy identifier with date of birth. Supplied name and date of birth are match criteria, not identity selectors.
 - Product search returns the product fields required by FR-2. Own-policy search returns policy dates and financial/payment totals required by FR-5.
+- Display own-policy search results in a table with the fields specified by the source brief.
 - Never return another customer's policy, payment, or personal data.
 - Validate criteria, use efficient database queries, and bound or paginate results.
 - Show a no-results message when no policies match.
 
 **Acceptance criteria**
 
-- Product search returns only active offers available to the customer; own-policy search returns only that customer's matching records.
+- Product search returns only active offers available to the customer; own-policy search returns only that customer's matching records and supports each source-brief search mode.
 - Search results never include another customer's policy, payment, or personal data.
 - Invalid or insufficient search criteria are rejected with clear feedback.
 - Large result sets are bounded or paginated.

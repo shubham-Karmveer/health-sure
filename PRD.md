@@ -92,6 +92,16 @@ No separate operations-user workflow is defined for the current release. Such a 
 
 ## 7. Functional requirements and acceptance criteria
 
+### Source-brief requirement crosswalk
+
+| Source brief requirement | PRD requirement |
+|---|---|
+| FR-1: Customer dashboard, available products, and registration entry point | FR-1 and FR-2 |
+| FR-2: AI-assisted recommendations | FR-3 |
+| FR-3: Policy registration | FR-4 |
+| FR-4: Premium payment management | FR-5 |
+| FR-5: Customer insurance policy search | FR-6 |
+
 ### FR-1: Authentication and customer dashboard
 
 - Authenticate customers using Spring Security and configured customer credentials.
@@ -163,7 +173,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 - Display installment number, scheduled amount, due date, grace-period end date, status, and selection for eligible pending installments.
 - Support one or multiple selected installments and partial payments where applicable.
 - Record payment date, unique transaction reference, amount, penalty, payment method, and transaction history.
-- Apply a 10% penalty to the outstanding premium amount when payment is made after the one-month grace period.
+- Apply a 10% penalty to the outstanding premium amount when payment is made after the one-calendar-month grace period.
 - Prevent duplicate payments against an installment and amounts greater than the outstanding amount.
 - Recalculate installment and policy outstanding balances. A policy is fully paid only when all applicable installments are paid.
 - Process payment changes transactionally.
@@ -172,7 +182,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 
 - A valid payment updates the installment, policy totals, and payment history consistently.
 - A payment cannot exceed the remaining amount due, including the applicable penalty.
-- A payment after the grace-period end date applies the specified 10% penalty to the outstanding premium amount; an on-time payment does not.
+- A payment after the one-calendar-month grace-period end date applies the specified 10% penalty to the outstanding premium amount; an on-time payment does not.
 - Repeated submission cannot create a duplicate transaction for the same payment request.
 - Partial payments are reflected as `PARTIALLY_PAID`; completed installments are `PAID`; unpaid installments retain the appropriate pending or overdue state.
 - If payment processing fails, no partial set of payment or balance updates is committed.
@@ -180,7 +190,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 ### FR-6: Marketplace product and own-policy search
 
 - Search active marketplace offers by product code, policy name, or policy type.
-- Separately search policy records owned by the authenticated customer by policy number or product name/type.
+- Separately search policy records owned by the authenticated customer using policy identifier, customer name, or policy identifier with date of birth, as defined in the source brief. Product name/type may also be used as filters where supported.
 - Product search returns the product fields required by FR-2. Own-policy search returns policy dates and financial/payment totals required by FR-5.
 - Never return another customer's policy, payment, or personal data.
 - Validate criteria, use efficient database queries, and bound or paginate results.
@@ -204,7 +214,7 @@ No separate operations-user workflow is defined for the current release. Such a 
 6. Premium arithmetic uses decimal-safe `BigDecimal`; money is not calculated with floating-point types.
 7. Installments follow the selected premium frequency and policy term.
 8. A payment must be positive and cannot exceed the outstanding amount.
-9. A late payment after the grace period incurs a 10% penalty on the outstanding premium amount.
+9. A late payment after the one-calendar-month grace period incurs a 10% penalty on the outstanding premium amount. The calendar month is calculated from the installment due date, including month-end clamping.
 10. Payment status and policy paid status are derived from recorded installments and payments, not from AI output.
 11. AI recommendations may select only eligible products retrieved from the database.
 12. Database constraints and transactional service logic enforce data integrity in addition to frontend validation.

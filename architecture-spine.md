@@ -112,6 +112,18 @@ Use `BigDecimal` for money and the Java Time API for calendar dates. Policy regi
 
 Use one shared Axios client for API requests and common error handling. Each screen should handle loading, empty, success, and error states. The server remains authoritative for eligibility, balances, status, and financial calculations.
 
+### Frontend routes
+
+| Route | Purpose | Access |
+|---|---|---|
+| `/` | Public home/landing page | Public |
+| `/login` | Customer sign-in | Public |
+| `/dashboard` | Customer profile, owned policies, and available products | Authenticated |
+| `/register?productCode=...` | Product-prefilled policy registration | Authenticated |
+| `/policy?policyNumber=...` | Policy details, installments, and payment history | Authenticated and owner-scoped |
+
+Use normal same-tab App Router navigation. After registration, navigate to the new policy's details route. Fixed route paths with query parameters keep the frontend compatible with static S3 hosting; authorization remains enforced by the backend.
+
 ## 5. Repository Structure
 
 Use a simple monorepo with separate frontend and backend projects. The frontend uses Next.js App Router:
@@ -124,7 +136,8 @@ health-sure/
 │   │   ├── app/                 # Next.js App Router pages and layouts
 │   │   ├── components/          # Shared UI components
 │   │   ├── features/
-│   │   │   ├── auth/
+│   │   │   ├── auth/            # Sign-in form
+│   │   │   ├── home/            # Public landing page
 │   │   │   ├── dashboard/
 │   │   │   ├── products/
 │   │   │   ├── recommendations/
@@ -190,6 +203,7 @@ Core constraints and behaviors:
 
 - Consistent identifier type and explicit foreign keys.
 - Unique customer/product registration, policy number, installment sequence per policy, and payment transaction reference.
+- Persist recommendation request preferences, calculated age, model/prompt versions, and ranked recommendation items with selected state.
 - Store policy financial terms as a snapshot so later catalog changes do not alter existing policies.
 - Keep payment transactions as persistent history and update installment/policy totals in the same transaction.
 - Use database constraints as well as application validation for important invariants.

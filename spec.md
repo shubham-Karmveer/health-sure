@@ -73,6 +73,7 @@ Use normalized relational tables, UUID identifiers consistently, explicit foreig
 | policy_number | unique, not null | Generated policy identifier |
 | customer_id | FK, indexed | Policy owner |
 | product_id | FK | Registered product |
+| term_months | positive integer | Registration-time policy term |
 | start_date, maturity_date | date | Policy period |
 | premium_frequency | enum/value | Registration-time product value |
 | premium_amount, sum_insured | NUMERIC(19,2) | Registration-time financial values |
@@ -90,7 +91,8 @@ Enforce `UNIQUE(customer_id, product_id)` as described in the product requiremen
 | policy_id | FK | Parent policy |
 | installment_number | positive integer | Sequence |
 | due_date, grace_period_end_date | date | Payment timing |
-| scheduled_amount, paid_amount | NUMERIC(19,2) | Scheduled amount and paid premium |
+| scheduled_amount, paid_amount | NUMERIC(19,2) | Scheduled amount and paid premium principal |
+| penalty_amount, paid_penalty_amount | NUMERIC(19,2) | Assessed and paid penalty totals |
 | payment_status | enum/value | `PENDING`, `PARTIALLY_PAID`, `PAID`, or `OVERDUE` |
 
 Enforce `UNIQUE(policy_id, installment_number)`. Keep payment transactions separate from installment aggregates.
@@ -105,19 +107,52 @@ The database design in the assessment also calls for `paid_amount` to remain wit
 | installment_id | FK, indexed | Paid installment |
 | transaction_reference | unique, not null | Payment transaction identifier |
 | payment_date | date/timestamp | Recorded payment time |
-| amount_paid, penalty_amount | NUMERIC(19,2) | Payment and applicable penalty |
+| amount_paid, premium_amount, penalty_amount | NUMERIC(19,2) | Total collected and its premium/penalty allocations |
 | payment_method | value | Method recorded for the payment |
 | created_at | timestamp with time zone | Audit timestamp |
+| idempotency_id | FK | Idempotency record for the payment batch |
 
 Payments are append-only transaction history. Balance and status updates must be consistent with persisted payment records.
 
-Enforce `amount_paid > 0` and a unique transaction reference; index installment and payment date for history lookups.
+Enforce `amount_paid > 0`, `amount_paid = premium_amount + penalty_amount`, and a unique transaction reference; index installment and payment date for history lookups. A payment batch is recorded in `payment_idempotency`, keyed by customer and idempotency key, with the request hash and original response for exact retries.
 
-### 3.6 Recommendation request and items
+### 3.6 Payment idempotency
 
-**Recommendation request:** request ID, customer FK, insurance goals, preferred term, preferred type, calculated age, model name/version, prompt version, and request timestamp.
+| Field | Type/constraint | Notes |
+|---|---|---|
+| idempotency_id | PK | Identifier |
+| customer_id, policy_id | FK | Owner and policy for the request |
+| idempotency_key | unique with customer_id | Client-supplied retry key |
+| request_hash | not null | Detects incompatible key reuse |
+| response_json | not null | Original response returned for an exact retry |
+| created_at | timestamp with time zone | Audit timestamp |
 
-**Recommendation item:** item ID, request FK, product FK, rank, rationale, suitability, and selected-for-registration state. Enforce `UNIQUE(recommendation_request_id, product_id)`. Items may reference only products eligible at generation time.
+### 3.7 Recommendation request
+
+| Field | Type/constraint | Notes |
+|---|---|---|
+| recommendation_request_id | PK | Identifier |
+| customer_id | FK, indexed with requested_at | Authenticated customer |
+| insurance_goals | nullable text | Customer preference |
+| preferred_term | nullable string | Customer preference |
+| preferred_policy_type | nullable string | Customer preference |
+| calculated_age | non-negative integer | Calculated from the customer's profile date of birth |
+| model_name, model_version, prompt_version | not null strings | Reproducibility/audit metadata |
+| requested_at | timestamp with time zone | Request timestamp |
+
+### 3.8 Recommendation item
+
+| Field | Type/constraint | Notes |
+|---|---|---|
+| recommendation_item_id | PK | Identifier |
+| recommendation_request_id | FK | Parent recommendation request |
+| product_id | FK | Catalog product, validated as eligible before persistence |
+| rank_order | positive integer, unique per request | Display order |
+| recommendation_reason | text, not null | Advisory explanation |
+| suitability | not null string | Advisory suitability result |
+| selected_for_registration | boolean, not null | Whether the customer selected the item |
+
+Enforce `UNIQUE(recommendation_request_id, product_id)` and `UNIQUE(recommendation_request_id, rank_order)`.
 
 ## 4. API design
 
@@ -189,10 +224,11 @@ The customer and product-dependent financial values are resolved by the server; 
 ```
 
 The payment API requires an `Idempotency-Key` header and must not create duplicate transactions when a request is retried with the same key.
+The key is required, limited to 128 characters, and scoped to the authenticated customer. An exact retry returns the original payment response; reuse with a different policy or payment payload returns `409 Conflict`.
 
 ### 4.3 Search criteria
 
-Marketplace product search supports product code, policy name, and policy type over active products available to the authenticated customer. Customer policy search supports policy number and product name/type filters, but only against records owned by the authenticated customer. Both searches are paginated, validate that at least one supported criterion is provided, and must not use a supplied customer name or date of birth to expand access to another customer's records.
+Marketplace product search supports product code, policy name, and policy type over active products available to the authenticated customer. Customer policy search supports policy identifier, customer name, and policy identifier plus date of birth, matching the source brief's search modes. Every policy search is restricted to the authenticated customer's own records; supplied name or date of birth is an additional match criterion, never an identity selector. Both searches are paginated and validate that a supported criterion is provided.
 
 ### 4.4 Required UI response fields
 
@@ -202,7 +238,7 @@ Response DTOs must include the information needed by the interfaces described in
 - **Available product:** product code, policy name, policy type, term, sum insured, premium frequency, premium amount, and registration action/product reference.
 - **Recommendation:** product fields from the available-product response, recommendation reason, suitability, and registration action/product reference.
 - **Registration form/result:** customer name, date of birth, contact information; product type/name/term; policy start and calculated maturity dates; premium frequency and amount; sum insured; total premium payable; and, on success, generated policy identifier and confirmation.
-- **Policy payment view:** policy identifier, customer name, policy name, term, start and maturity dates, total premium payable, total premium paid, remaining premium, plus installment number, scheduled amount, due date, grace-period end date, payment status, and a checkbox for each eligible pending installment.
+- **Policy payment view:** policy identifier, customer name, policy name, term, start and maturity dates, total premium payable, total premium paid, remaining premium, assessed/paid/remaining penalties, estimated late penalty and estimated full amount due, plus installment number, scheduled amount, due date, grace-period end date, payment status, and a checkbox for each installment with a balance.
 - **Payment history:** transaction reference, payment date, installment, amount paid, penalty amount, and payment method.
 - **Policy search result:** policy identifier, customer name, date of birth, policy name/type, start and maturity dates, total premium payable, premium payment status, total premium paid, and remaining premium.
 
@@ -249,13 +285,13 @@ Within one database transaction:
 
 1. Resolve the authenticated customer and active product.
 2. Check date of birth and age against the product’s configured entry limits.
-3. Validate positive term and financial values and a valid start date.
+3. Validate positive term and financial values and require the policy start date to be today or later.
 4. Calculate maturity date and total payable using the product term and payment frequency. Derive the number of installments from the policy term and frequency; product configuration must produce a valid schedule.
 5. Generate a unique policy number.
 6. Create the customer policy and all scheduled installments.
 7. Commit only when the policy and complete schedule are persisted.
 
-Use decimal arithmetic with explicit scale/rounding rules. Convert premium frequency to its interval in months (monthly: 1, quarterly: 3, half-yearly: 6, yearly: 12). Calculate installment count as `term_months / interval_months`, and total premium payable as `premium_amount × installment_count`; product configuration must yield a whole number of installments. Generate each installment from the start date and frequency. The source example is consistent with maturity being one day before the date reached by adding the term to the start date. Confirm the exact inclusive-date convention and installment date anchoring before treating them as contractual rules.
+Use decimal arithmetic with explicit scale/rounding rules. Convert premium frequency to its interval in months (monthly: 1, quarterly: 3, half-yearly: 6, yearly: 12). Calculate installment count as `term_months / interval_months`, and total premium payable as `premium_amount × installment_count`; product configuration must yield a whole number of installments. The first due date is the policy start date; calculate subsequent due dates from the original start date and interval to preserve month-end anchoring. Each grace-period end date is one calendar month after its due date using `LocalDate.plusMonths(1)`; Java's month-end clamping applies (for example, January 31 plus one month is the last day of February). A payment is late only after the grace-period end date. Calculate maturity as `start_date + term_months - 1 day`.
 
 ### 5.5 Payment processing
 
@@ -264,12 +300,13 @@ Process a payment request transactionally:
 1. Resolve the policy and confirm the caller is authorized to operate on it.
 2. Lock or otherwise safely coordinate updates to the affected installments.
 3. Validate each selected installment belongs to the policy, amount is positive, and amount does not exceed the allowed outstanding amount.
-4. Determine whether each installment is beyond its grace-period end date and apply the specified 10% penalty to the outstanding premium amount when applicable.
-5. Record a unique payment transaction and update paid amount/status.
-6. Recalculate policy totals and overall payment state.
-7. Commit all selected installment updates and transaction records together.
+4. On the first valid payment after an installment's grace-period end date, assess a one-time penalty equal to 10% of its outstanding principal, rounded to two decimal places using half-up rounding. Do not compound or reassess it.
+5. Treat each request amount as the total collected, including any penalty. Allocate it to unpaid penalty first and then to premium principal; track both allocations separately. Reject a payment greater than the combined outstanding amount.
+6. Record a unique payment transaction and update paid amount/status.
+7. Recalculate policy totals and overall payment state.
+8. Commit all selected installment updates and transaction records together.
 
-Repeated requests must be idempotent or rejected without adding duplicate payment records. Payment status is based on actual persisted amounts: `PAID` when satisfied, `PARTIALLY_PAID` when some amount is paid, and pending/overdue as appropriate. Define whether penalty amounts are included in installment paid totals or tracked separately; this requires a consistent accounting rule.
+Repeated requests must be idempotent or rejected without adding duplicate payment records. Payment status is based on persisted principal and penalty balances: `PAID` only when both are satisfied; otherwise use `PARTIALLY_PAID`, `PENDING`, or `OVERDUE` as appropriate. Payment method is recorded as a non-empty value of at most 40 characters; no payment gateway is used in this release.
 
 ### 5.6 Policy search
 
@@ -369,6 +406,8 @@ Never commit secrets. Use schema migrations or another controlled schema-managem
 6. **Late penalty:** Apply a 10% penalty once per installment, on principal outstanding at the first late payment. Track the penalty separately and do not compound or reapply it.
 7. **Payment idempotency:** Require an `Idempotency-Key` header. The server generates the transaction reference and must not create duplicate payment records for retries with the same key.
 8. **Recommendations:** Return up to three eligible products. If the configured provider is unavailable, return an explicit `503`; do not fabricate results or use ungrounded fallback recommendations.
+9. **Installment grace period:** Set each installment's grace-period end date to one calendar month after its due date using `LocalDate.plusMonths(1)`; a payment after that date is late.
+10. **Policy start date:** A policy start date must be today or a future date.
 
 ### Remaining confirmations
 

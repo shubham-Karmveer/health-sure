@@ -1,34 +1,23 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   DashboardData,
   fetchDashboard,
   getApiErrorMessage,
   isUnauthorized,
-  signIn,
   signOut,
 } from "@/lib/api/healthdekho-api";
+import AvailableProducts from "@/features/products/AvailableProducts";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-
-  const loadDashboard = useCallback(async () => {
-    try {
-      setDashboard(await fetchDashboard());
-    } catch (requestError) {
-      if (isUnauthorized(requestError)) {
-        setDashboard(null);
-      } else {
-        setError("HealthDekho could not connect to the API. Check that the local backend is running.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -43,7 +32,7 @@ export default function Dashboard() {
           return;
         }
         if (isUnauthorized(requestError)) {
-          setDashboard(null);
+          router.replace("/login");
         } else {
           setError("HealthDekho could not connect to the API. Check that the local backend is running.");
         }
@@ -56,31 +45,14 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, []);
-
-  async function handleSignIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setSubmitting(true);
-    setLoading(true);
-    setError("");
-    try {
-      await signIn(String(formData.get("email")), String(formData.get("password")));
-      await loadDashboard();
-    } catch (requestError) {
-      setLoading(false);
-      setError(getApiErrorMessage(requestError));
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  }, [router]);
 
   async function handleSignOut() {
     setSubmitting(true);
     setError("");
     try {
       await signOut();
-      setDashboard(null);
+      router.replace("/login");
     } catch (requestError) {
       setError(getApiErrorMessage(requestError));
     } finally {
@@ -88,90 +60,95 @@ export default function Dashboard() {
     }
   }
 
+  function handleRegistration(productCode: string) {
+    router.push(`/register?productCode=${encodeURIComponent(productCode)}`);
+  }
+
   return (
     <main className="shell">
       <header className="topbar">
         <div>
-          <span className="eyebrow">Insurance, made clearer</span>
-          <h1>HealthDekho</h1>
+          <Link className="text-link" href="/">HealthDekho</Link>
+          <p className="eyebrow">Customer dashboard</p>
         </div>
-        {dashboard && (
-          <button className="button button-secondary" disabled={submitting} onClick={handleSignOut}>
-            Sign out
-          </button>
-        )}
+        <button className="button button-secondary" disabled={submitting} onClick={handleSignOut}>
+          Sign out
+        </button>
       </header>
 
       {error && <p className="alert" role="alert">{error}</p>}
 
       {loading ? (
-        <p className="loading" role="status">Checking your account…</p>
+        <p className="loading" role="status">Loading your dashboard…</p>
       ) : dashboard ? (
-        <section className="panel" aria-labelledby="dashboard-title">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Customer dashboard</p>
-              <h2 id="dashboard-title">Welcome, {dashboard.customer.fullName}</h2>
-              <p className="muted">{dashboard.customer.email}</p>
+        <>
+          <section className="panel" aria-labelledby="dashboard-title">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Your account</p>
+                <h1 id="dashboard-title">Welcome, {dashboard.customer.fullName}</h1>
+                <p className="muted">{dashboard.customer.email}</p>
+              </div>
             </div>
-          </div>
 
-          <div className="section-heading">
-            <h3>Your policies</h3>
-            <span className="count">{dashboard.policies.length}</span>
-          </div>
-          {dashboard.policies.length === 0 ? (
-            <div className="empty-state">
-              <h4>No policies yet</h4>
-              <p>Available insurance products will appear here when you are ready to explore them.</p>
+            <div className="section-heading">
+              <h2>Your policies</h2>
+              <span className="count">{dashboard.policies.length}</span>
             </div>
-          ) : (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Policy</th>
-                    <th>Type</th>
-                    <th>Term</th>
-                    <th>Premium</th>
-                    <th>Coverage</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboard.policies.map((policy) => (
-                    <tr key={policy.policyNumber}>
-                      <td>
-                        <strong>{policy.policyName}</strong>
-                        <span className="table-subtitle">{policy.policyNumber}</span>
-                      </td>
-                      <td>{policy.policyType}</td>
-                      <td>{policy.termMonths} months</td>
-                      <td>{formatMoney(policy.premiumAmount)} / {policy.premiumFrequency.toLowerCase()}</td>
-                      <td>{formatMoney(policy.sumInsured)}</td>
-                      <td><span className="status">{policy.status}</span></td>
+            {dashboard.policies.length === 0 ? (
+              <div className="empty-state">
+                <h3>No policies yet</h3>
+                <p>Browse available products below to register your first policy.</p>
+              </div>
+            ) : (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Policy</th>
+                      <th>Type</th>
+                      <th>Term</th>
+                      <th>Start date</th>
+                      <th>Maturity date</th>
+                      <th>Premium</th>
+                      <th>Coverage</th>
+                      <th>Status</th>
+                      <th>Payments</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody>
+                    {dashboard.policies.map((policy) => (
+                      <tr key={policy.policyNumber}>
+                        <td>
+                          <strong>{policy.policyName}</strong>
+                          <span className="table-subtitle">{policy.policyNumber}</span>
+                        </td>
+                        <td>{policy.policyType}</td>
+                        <td>{policy.termMonths} months</td>
+                        <td>{policy.startDate}</td>
+                        <td>{policy.maturityDate}</td>
+                        <td>{formatMoney(policy.premiumAmount)} / {policy.premiumFrequency.toLowerCase()}</td>
+                        <td>{formatMoney(policy.sumInsured)}</td>
+                        <td><span className="status">{policy.status}</span></td>
+                        <td>
+                          <Link
+                            className="button button-secondary"
+                            href={`/policy?policyNumber=${encodeURIComponent(policy.policyNumber)}`}
+                          >
+                            Manage payments
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+          <AvailableProducts onRegister={handleRegistration} />
+        </>
       ) : (
-        <section className="panel sign-in-panel" aria-labelledby="sign-in-title">
-          <p className="eyebrow">Customer access</p>
-          <h2 id="sign-in-title">Sign in to your account</h2>
-          <p className="muted">Use your HealthDekho customer credentials to continue.</p>
-          <form onSubmit={handleSignIn}>
-            <label htmlFor="email">Email</label>
-            <input id="email" name="email" type="email" autoComplete="username" required />
-            <label htmlFor="password">Password</label>
-            <input id="password" name="password" type="password" autoComplete="current-password" required />
-            <button className="button" type="submit" disabled={submitting}>
-              {submitting ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
-        </section>
+        <p className="muted">Redirecting to sign in…</p>
       )}
     </main>
   );

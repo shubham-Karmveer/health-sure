@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "app.seed.customer.enabled", havingValue = "true")
@@ -39,15 +40,50 @@ public class LocalCustomerSeeder implements ApplicationRunner {
                     "SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD are required when local customer seeding is enabled."
             );
         }
-        if (customerRepository.findByEmailIgnoreCase(email).isEmpty()) {
+        List<SampleCustomer> sampleCustomers = List.of(
+                new SampleCustomer(
+                        "aarav.sharma@example.com",
+                        "Aarav Sharma",
+                        LocalDate.of(1990, 4, 15),
+                        "9876501001"
+                ),
+                new SampleCustomer(
+                        "meera.iyer@example.com",
+                        "Meera Iyer",
+                        LocalDate.of(1985, 9, 22),
+                        "9876501002"
+                ),
+                new SampleCustomer(
+                        "rohan.verma@example.com",
+                        "Rohan Verma",
+                        LocalDate.of(2000, 1, 10),
+                        "9876501003"
+                )
+        );
+        SampleCustomer configuredCustomer = sampleCustomers.stream()
+                .filter(customer -> customer.email().equalsIgnoreCase(email))
+                .findFirst()
+                .orElse(new SampleCustomer(email, "Local Demo Customer", LocalDate.of(1990, 1, 1), null));
+
+        seedCustomer(configuredCustomer);
+        sampleCustomers.stream()
+                .filter(customer -> !customer.email().equalsIgnoreCase(configuredCustomer.email()))
+                .forEach(this::seedCustomer);
+    }
+
+    private void seedCustomer(SampleCustomer sampleCustomer) {
+        if (customerRepository.findByEmailIgnoreCase(sampleCustomer.email()).isEmpty()) {
             customerRepository.save(new Customer(
-                    email,
+                    sampleCustomer.email(),
                     passwordEncoder.encode(password),
-                    "Local Demo Customer",
-                    LocalDate.of(1990, 1, 1),
-                    null,
+                    sampleCustomer.fullName(),
+                    sampleCustomer.dateOfBirth(),
+                    sampleCustomer.phone(),
                     "ACTIVE"
             ));
         }
+    }
+
+    private record SampleCustomer(String email, String fullName, LocalDate dateOfBirth, String phone) {
     }
 }

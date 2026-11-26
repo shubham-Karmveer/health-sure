@@ -41,3 +41,5 @@ app:
       enabled: ${SEED_CUSTOMER_ENABLED:false}
       email: ${SEED_CUSTOMER_EMAIL:}
       password: ${SEED_CUSTOMER_PASSWORD:}
+    catalog:
+      enabled: ${SEED_CATALOG_ENABLED:true}

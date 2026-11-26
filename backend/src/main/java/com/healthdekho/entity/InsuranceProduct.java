@@ -101,4 +101,12 @@ public class InsuranceProduct {
     public boolean isActive() {
         return active;
     }
+
+    public int getMinEntryAge() {
+        return minEntryAge;
+    }
+
+    public int getMaxEntryAge() {
+        return maxEntryAge;
+    }
 }

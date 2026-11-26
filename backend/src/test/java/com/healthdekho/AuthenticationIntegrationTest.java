@@ -65,13 +65,33 @@ class AuthenticationIntegrationTest {
                 "ACTIVE"
         ));
         InsuranceProduct product = productRepository.save(new InsuranceProduct(
-                "HD-TERM-001",
-                "Family Term Cover",
+                "HD-TEST-TERM-001",
+                "HealthDekho Secure Term",
                 "TERM",
                 240,
                 "MONTHLY",
                 new BigDecimal("1250.00"),
                 new BigDecimal("1000000.00"),
+                18,
+                60,
+                true
+        ));
+        Customer otherCustomer = customerRepository.save(new Customer(
+                "other@example.com",
+                passwordEncoder.encode(PASSWORD),
+                "Other Customer",
+                LocalDate.of(1988, 2, 10),
+                null,
+                "ACTIVE"
+        ));
+        InsuranceProduct otherProduct = productRepository.save(new InsuranceProduct(
+                "HD-TERM-002",
+                "Other Customer Cover",
+                "TERM",
+                120,
+                "MONTHLY",
+                new BigDecimal("900.00"),
+                new BigDecimal("500000.00"),
                 18,
                 60,
                 true
@@ -89,6 +109,19 @@ class AuthenticationIntegrationTest {
                 new BigDecimal("300000.00"),
                 "ACTIVE"
         ));
+        policyRepository.save(new CustomerPolicy(
+                "HD-POL-0002",
+                otherCustomer,
+                otherProduct,
+                120,
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2036, 1, 31),
+                "MONTHLY",
+                new BigDecimal("900.00"),
+                new BigDecimal("500000.00"),
+                new BigDecimal("108000.00"),
+                "ACTIVE"
+        ));
 
         CsrfFixture csrf = getCsrfFixture();
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
@@ -104,6 +137,7 @@ class AuthenticationIntegrationTest {
         assertThat(authCookie).isNotNull();
         assertThat(authCookie.isHttpOnly()).isTrue();
         assertThat(loginResult.getResponse().getHeader("Set-Cookie")).contains("SameSite=Lax");
+        assertThat(loginResult.getResponse().getHeader("Set-Cookie")).contains("Max-Age=1800");
 
         mockMvc.perform(get("/api/customers/me").cookie(authCookie))
                 .andExpect(status().isOk())
@@ -113,8 +147,9 @@ class AuthenticationIntegrationTest {
 
         mockMvc.perform(get("/api/me/policies").cookie(authCookie))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].policyNumber").value("HD-POL-0001"))
-                .andExpect(jsonPath("$[0].policyName").value("Family Term Cover"));
+                .andExpect(jsonPath("$[0].policyName").value("HealthDekho Secure Term"));
     }
 
     @Test
@@ -122,6 +157,54 @@ class AuthenticationIntegrationTest {
         mockMvc.perform(get("/api/customers/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/me/policies"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void customerWithoutPoliciesReceivesAnEmptyList() throws Exception {
+        customerRepository.save(new Customer(
+                EMAIL,
+                passwordEncoder.encode(PASSWORD),
+                "Test Customer",
+                LocalDate.of(1990, 4, 15),
+                null,
+                "ACTIVE"
+        ));
+        Cookie authCookie = loginAndGetAuthCookie();
+
+        mockMvc.perform(get("/api/me/policies").cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void logoutClearsTheAuthenticationCookie() throws Exception {
+        customerRepository.save(new Customer(
+                EMAIL,
+                passwordEncoder.encode(PASSWORD),
+                "Test Customer",
+                LocalDate.of(1990, 4, 15),
+                null,
+                "ACTIVE"
+        ));
+        Cookie authCookie = loginAndGetAuthCookie();
+        CsrfFixture csrf = getCsrfFixture();
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .cookie(authCookie, csrf.cookie())
+                        .header(csrf.headerName(), csrf.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(false))
+                .andExpect(result -> {
+                    Cookie clearedCookie = result.getResponse().getCookie("HD_ACCESS_TOKEN");
+                    assertThat(clearedCookie).isNotNull();
+                    assertThat(clearedCookie.getMaxAge()).isZero();
+                    assertThat(clearedCookie.isHttpOnly()).isTrue();
+                });
     }
 
     @Test
@@ -160,6 +243,18 @@ class AuthenticationIntegrationTest {
                 response.get("headerName").asText(),
                 response.get("token").asText()
         );
+    }
+
+    private Cookie loginAndGetAuthCookie() throws Exception {
+        CsrfFixture csrf = getCsrfFixture();
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .cookie(csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(new LoginPayload(EMAIL, PASSWORD))))
+                .andExpect(status().isOk())
+                .andReturn();
+        return result.getResponse().getCookie("HD_ACCESS_TOKEN");
     }
 
     private record LoginPayload(String email, String password) {

@@ -51,12 +51,12 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Tasks**
 
-- [ ] S1.1 Add versioned schema migrations and customer persistence with BCrypt password hashes.
-- [ ] S1.2 Implement Spring Security JWT authentication using 30-minute HttpOnly cookies and derive customer identity from the authenticated principal.
-- [ ] S1.3 Implement `POST /api/auth/login` and the agreed logout/session behavior.
-- [ ] S1.4 Implement `GET /api/customers/me` and `GET /api/me/policies` with response DTOs.
-- [ ] S1.5 Build sign-in and dashboard screens with loading, error, and no-policy states.
-- [ ] S1.6 Add a safe local-only customer seed process for tests/demo; never commit real passwords.
+- [x] S1.1 Add versioned schema migrations and customer persistence with BCrypt password hashes.
+- [x] S1.2 Implement Spring Security JWT authentication using 30-minute HttpOnly cookies and derive customer identity from the authenticated principal.
+- [x] S1.3 Implement `POST /api/auth/login` and the agreed logout/session behavior.
+- [x] S1.4 Implement `GET /api/customers/me` and `GET /api/me/policies` with response DTOs.
+- [x] S1.5 Build sign-in and dashboard screens with loading, error, and no-policy states.
+- [x] S1.6 Add a safe local-only customer seed process for tests/demo; never commit real passwords.
 
 **Exit verification**
 
@@ -66,6 +66,10 @@ The target code layout and eventual AWS services are described in [architecture-
 - A customer with no policies sees an explicit empty state.
 - Controller/security tests and frontend sign-in/dashboard tests pass against local PostgreSQL.
 
+**Progress:** Complete. Sprint 1 implements the local sign-in and customer dashboard flow; customer identity is derived from the JWT subject, policy queries are scoped to that customer, and the optional demo seed stores a BCrypt hash without replacing existing accounts.
+
+**Verification:** `mvn -f backend/pom.xml test` passed (9 tests); `npm --prefix frontend test`, `npm --prefix frontend run lint`, `npm --prefix frontend run typecheck`, and `npm --prefix frontend run build` passed (6 frontend tests). A local HTTP smoke test returned frontend HTTP 200 and verified seeded-customer login, profile retrieval, an empty policy list, and logout against PostgreSQL.
+
 ## Sprint 2 — Product discovery and policy registration
 
 **Goal:** Let a signed-in customer discover eligible products and register a policy with a complete installment schedule.
@@ -74,13 +78,13 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Tasks**
 
-- [ ] S2.1 Add product, customer-policy, and installment migrations, entities, and repositories.
-- [ ] S2.2 Add deterministic development catalog seed data with varied product terms and eligibility rules.
-- [ ] S2.3 Implement `GET /api/products/available`, excluding inactive and already-registered products.
-- [ ] S2.4 Implement `POST /api/policies` and service-level eligibility validation.
-- [ ] S2.5 Generate policy dates, totals, and installment schedules transactionally using `BigDecimal` and the approved calendar rules.
-- [ ] S2.6 Enforce unique policy number, customer/product registration, and installment sequence constraints.
-- [ ] S2.7 Build product listing and registration form with server validation feedback and success confirmation.
+- [x] S2.1 Add product, customer-policy, and installment migrations, entities, and repositories.
+- [x] S2.2 Add deterministic development catalog seed data with varied product terms and eligibility rules.
+- [x] S2.3 Implement `GET /api/products/available`, excluding inactive and already-registered products.
+- [x] S2.4 Implement `POST /api/policies` and service-level eligibility validation.
+- [x] S2.5 Generate policy dates, totals, and installment schedules transactionally using `BigDecimal` and the approved calendar rules.
+- [x] S2.6 Enforce unique policy number, customer/product registration, and installment sequence constraints.
+- [x] S2.7 Build product listing and registration form with server validation feedback and success confirmation.
 
 **Exit verification**
 
@@ -91,6 +95,10 @@ The target code layout and eventual AWS services are described in [architecture-
 - Premium totals, maturity, and installment dates pass boundary tests using the approved rules.
 - Local UI → API → PostgreSQL flow completes and the new policy appears on the dashboard.
 
+**Progress:** Complete. The local PostgreSQL catalog seeds the three products and eligibility values from the source brief, plus an inactive sample excluded from discovery. Optional customer seeding provides the source brief's three sample customer profiles with BCrypt hashes using a local-only configured password. Authenticated customers can register an eligible product; policy and all installments persist together, and duplicate registration is blocked.
+
+**Verification:** `mvn -f backend/pom.xml test` passed (16 tests), including PostgreSQL integration checks for catalog filtering, eligibility, duplicate registration, database schedule constraints, monthly/quarterly schedules, maturity, and grace dates. `npm --prefix frontend test` passed (9 tests), and frontend lint, typecheck, and production build passed.
+
 ## Sprint 3 — Policy details and payment management
 
 **Goal:** Let a customer review a policy schedule and record payments with consistent balances and transaction history.
@@ -99,11 +107,11 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Tasks**
 
-- [ ] S3.1 Add payment and idempotency schema, including unique transaction references.
-- [ ] S3.2 Implement policy detail, installment, and payment-history endpoints with ownership enforcement.
-- [ ] S3.3 Implement payment validation, concurrency coordination, penalty calculation, status updates, and atomic transaction handling.
-- [ ] S3.4 Implement retry-safe idempotency using the agreed request key contract.
-- [ ] S3.5 Build installment selection, payment submission, updated totals, and payment history UI.
+- [x] S3.1 Add payment and idempotency schema, including unique transaction references.
+- [x] S3.2 Implement policy detail, installment, and payment-history endpoints with ownership enforcement.
+- [x] S3.3 Implement payment validation, concurrency coordination, penalty calculation, status updates, and atomic transaction handling.
+- [x] S3.4 Implement retry-safe idempotency using the agreed request key contract.
+- [x] S3.5 Build installment selection, payment submission, updated totals, and payment history UI.
 
 **Exit verification**
 
@@ -111,9 +119,13 @@ The target code layout and eventual AWS services are described in [architecture-
 - On-time, late, partial, fully paid, and repeated-payment cases match approved rules.
 - Overpayments and invalid installment references are rejected.
 - Retrying the same idempotency key cannot create duplicate payment records.
-- A forced error in a multi-installment operation leaves no partial updates.
+- A rejected multi-installment operation leaves no partial updates.
 - Payment history, installment statuses, and policy totals reconcile against persisted records.
 - The complete payment flow works locally using PostgreSQL.
+
+**Progress:** Complete. Authenticated customers can review their policy totals and installment schedule, record one or more manual payments, and view transaction history. Late payments assess a one-time 10% penalty on remaining principal; collected amounts are allocated to penalty before premium. Payment requests use customer-scoped idempotency keys and row locks.
+
+**Verification:** `mvn -f backend/pom.xml test` passed (20 tests), including PostgreSQL-backed checks for ownership, on-time full and partial payments, late-payment penalty-first allocation, idempotent retries, conflicting key reuse, overpayment rejection, and no partial writes on rejected batches. Frontend tests passed (10 tests); lint, typecheck, and production build passed.
 
 ## Sprint 4 — AI-assisted recommendations
 
@@ -121,9 +133,11 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **FR alignment:** FR-3.
 
+**Prerequisites:** Local implementation and automated verification require no AWS account, API key, or Bedrock credentials because they use a deterministic provider stub. A manual Bedrock smoke test is optional and requires a selected model ID, a supported AWS region with model access enabled, and an AWS IAM identity with `bedrock:InvokeModel`. Use a local AWS profile/SSO session during development and an instance role after deployment; Bedrock does not use a separate API key. Add the Spring AI dependency and Bedrock adapter during S4.3; they are not yet present in the backend.
+
 **Tasks**
 
-- [ ] S4.1 Add recommendation request/item migrations, entities, and repositories.
+- [x] S4.1 Add recommendation request/item migrations, entities, and repositories.
 - [ ] S4.2 Implement customer preference validation, age calculation, and eligible-candidate selection.
 - [ ] S4.3 Implement a recommendation provider interface, deterministic local test stub, and Bedrock adapter.
 - [ ] S4.4 Parse provider output into typed data and reject unknown, inactive, or ineligible product references.
@@ -139,6 +153,8 @@ The target code layout and eventual AWS services are described in [architecture-
 - Provider timeout/failure returns an explicit error and never fabricates a successful response.
 - When explicitly configured with valid local AWS credentials, a manual Bedrock smoke test can be run; it is not a CI or local startup requirement.
 
+**Progress:** S4.1 data-model foundation was implemented during pre-Sprint-4 requirement alignment: PostgreSQL tables, audit and lookup indexes, JPA entities, and repositories are present. Recommendation generation, provider integration, endpoints, and UI remain pending.
+
 ## Sprint 5 — Policy search and local end-to-end verification
 
 **Goal:** Complete supported customer policy search and verify all current-release user journeys locally.
@@ -147,7 +163,7 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **Tasks**
 
-- [ ] S5.1 Implement marketplace product-offer search and authenticated-customer-owned policy search with database-backed queries, validation, and pagination.
+- [ ] S5.1 Implement marketplace product-offer search and authenticated-customer-owned policy search with database-backed queries, validation, and pagination. Own-policy criteria must support policy identifier, customer name, and policy identifier plus date of birth, without exposing other customers' records.
 - [ ] S5.2 Build search form, paginated results, error display, and no-results state.
 - [ ] S5.3 Add tests for each supported search mode and confirm unauthorized records are never returned.
 - [ ] S5.4 Run backend unit/service/controller tests, PostgreSQL integration tests, and frontend tests.
@@ -177,10 +193,10 @@ The target code layout and eventual AWS services are described in [architecture-
 
 | PRD requirement | Sprint | Completion evidence |
 |---|---:|---|
-| FR-1 Authentication and customer dashboard | 1 | Authentication/security, profile/dashboard API, and UI tests |
-| FR-2 Product discovery and registration entry point | 2 | Product filtering, registration entry point, and UI/API tests |
+| FR-1 Authentication and customer dashboard | 1 | Completed: JWT-cookie auth, own-customer profile/policy APIs, seed, and UI/API verification |
+| FR-2 Product discovery and registration entry point | 2 | Completed: seeded catalog filtering, registration entry point, and UI/API tests |
 | FR-3 AI-assisted recommendations | 4 | Candidate validation, metadata persistence, provider failure, and UI tests |
-| FR-4 Policy registration | 2 | Eligibility, schedule calculation, uniqueness, atomicity, and UI tests |
+| FR-4 Policy registration | 2 | Completed: age/date validation, transactional schedule generation, uniqueness, and UI/API tests |
 | FR-5 Premium schedule and payment management | 2–3 | Schedule, penalty, partial payment, idempotency, ownership, and transaction tests |
 | FR-6 Marketplace product and own-policy search | 5 | Active offer filters, own-policy authorization, pagination, and UI tests |
 | Local build, testing, and developer setup | 0–5 | Clean local start/build/test verification |

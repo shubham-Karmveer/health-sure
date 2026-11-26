@@ -2,6 +2,7 @@ package com.healthdekho.exception;
 
 import com.healthdekho.dto.ApiErrorResponse;
 import com.healthdekho.dto.FieldErrorResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -32,7 +33,21 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> statusError(ResponseStatusException exception) {
         HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
-        return error(status, status.name(), "The requested resource is not available.", List.of());
+        String message = exception.getReason();
+        if (message == null || message.isBlank()) {
+            message = "The requested resource is not available.";
+        }
+        return error(status, status.name(), message, List.of());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> dataConflict() {
+        return error(
+                HttpStatus.CONFLICT,
+                "CONFLICT",
+                "The request conflicts with an existing record.",
+                List.of()
+        );
     }
 
     private ResponseEntity<ApiErrorResponse> error(

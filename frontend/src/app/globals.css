@@ -55,6 +55,54 @@ body {
   line-height: 1.6;
 }
 
+.home-shell {
+  min-height: 100vh;
+}
+
+.home-nav,
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.home-hero {
+  max-width: 48rem;
+  margin: 4rem auto 0;
+  padding: clamp(2rem, 6vw, 4rem);
+  border: 1px solid #dfe5ec;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1rem 2.5rem rgb(23 32 51 / 6%);
+}
+
+.home-hero h2 {
+  max-width: 38rem;
+  margin: 0.75rem 0;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+}
+
+.home-hero > p:not(.eyebrow) {
+  max-width: 38rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.home-actions {
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.text-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
 .status {
   display: inline-flex;
   margin-top: 1rem;
@@ -97,18 +145,21 @@ body {
   max-width: 32rem;
 }
 
-.sign-in-panel form {
+.sign-in-panel form,
+.registration-panel form {
   display: grid;
   gap: 0.6rem;
   margin-top: 1.5rem;
 }
 
-.sign-in-panel label {
+.sign-in-panel label,
+.registration-panel label {
   margin-top: 0.5rem;
   font-weight: 600;
 }
 
-.sign-in-panel input {
+.sign-in-panel input,
+.registration-panel input {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border: 1px solid #bdc7d4;
@@ -117,6 +168,7 @@ body {
 }
 
 .sign-in-panel input:focus-visible,
+.registration-panel input:focus-visible,
 .button:focus-visible {
   outline: 3px solid #8cc9bd;
   outline-offset: 2px;
@@ -175,6 +227,123 @@ body {
   color: var(--muted);
 }
 
+.products-section {
+  margin-top: 2rem;
+}
+
+.products-section > .section-heading {
+  margin-bottom: 1rem;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.product-card {
+  padding: 1.25rem;
+}
+
+.product-card h3 {
+  margin: 0.4rem 0 1rem;
+}
+
+.product-facts {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.product-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.product-facts dt {
+  color: var(--muted);
+}
+
+.product-facts dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.registration-panel {
+  max-width: 44rem;
+}
+
+.registration-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 1.25rem 0;
+  color: var(--muted);
+}
+
+.payments-panel {
+  margin-top: 2rem;
+}
+
+.payments-panel h3 {
+  margin-top: 1.75rem;
+}
+
+.payment-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.payment-summary > div {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #f5f7fb;
+}
+
+.payment-summary dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.payment-summary dd {
+  margin: 0.35rem 0 0;
+  font-weight: 700;
+}
+
+.payments-panel form > label {
+  display: block;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.payments-panel form > input {
+  width: min(100%, 20rem);
+  padding: 0.75rem;
+  border: 1px solid #bdc7d4;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.payments-panel td input[type="number"] {
+  width: 8rem;
+  padding: 0.5rem;
+  border: 1px solid #bdc7d4;
+  border-radius: 0.4rem;
+  font: inherit;
+}
+
+.success {
+  padding: 0.8rem 1rem;
+  border: 1px solid #add5c1;
+  border-radius: 0.5rem;
+  background: #effaf3;
+  color: #145a37;
+}
+
 .table-scroll {
   overflow-x: auto;
   margin-top: 1rem;
@@ -223,5 +392,10 @@ th {
   .topbar,
   .section-heading {
     align-items: flex-start;
+  }
+
+  .home-nav {
+    align-items: flex-end;
+    flex-direction: column;
   }
 }

@@ -26,17 +26,17 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <Link className="text-link" href="/">HealthDekho</Link>
-        <Link className="text-link" href="/">Home</Link>
-      </header>
-      <section className="panel sign-in-panel" aria-labelledby="sign-in-title">
+    <main className="auth-page">
+      <Link className="auth-brand" href="/">
+        <span className="brand-mark" aria-hidden="true">H</span>
+        HealthDekho
+      </Link>
+      <section className="auth-card" aria-labelledby="sign-in-title">
         <p className="eyebrow">Customer access</p>
-        <h1 id="sign-in-title">Sign in to your account</h1>
-        <p className="muted">Use your HealthDekho customer credentials to continue.</p>
+        <h1 id="sign-in-title">Welcome back</h1>
+        <p className="muted">Sign in to view and manage your policies.</p>
         {error && <p className="alert" role="alert">{error}</p>}
-        <form onSubmit={(event) => void handleSubmit(event)}>
+        <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
           <label htmlFor="email">Email</label>
           <input id="email" name="email" type="email" autoComplete="username" required />
           <label htmlFor="password">Password</label>
@@ -45,6 +45,10 @@ export default function LoginForm() {
             {submitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
+        <p className="auth-footer">
+          New to HealthDekho? <Link className="text-link" href="/signup">Create an account</Link>
+        </p>
+        <Link className="auth-back-link" href="/">Back to home</Link>
       </section>
     </main>
   );

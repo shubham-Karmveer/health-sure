@@ -6,18 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   DashboardData,
   fetchDashboard,
-  getApiErrorMessage,
   isUnauthorized,
-  signOut,
 } from "@/lib/api/healthdekho-api";
-import AvailableProducts from "@/features/products/AvailableProducts";
-import Recommendations from "@/features/recommendations/Recommendations";
+import PolicySearch from "@/features/policies/PolicySearch";
 
 export default function Dashboard() {
   const router = useRouter();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -48,61 +44,51 @@ export default function Dashboard() {
     };
   }, [router]);
 
-  async function handleSignOut() {
-    setSubmitting(true);
-    setError("");
-    try {
-      await signOut();
-      router.replace("/login");
-    } catch (requestError) {
-      setError(getApiErrorMessage(requestError));
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function handleRegistration(productCode: string) {
-    router.push(`/register?productCode=${encodeURIComponent(productCode)}`);
-  }
-
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <Link className="text-link" href="/">HealthDekho</Link>
-          <p className="eyebrow">Customer dashboard</p>
-        </div>
-        <button className="button button-secondary" disabled={submitting} onClick={handleSignOut}>
-          Sign out
-        </button>
-      </header>
-
+    <div className="dashboard-content">
       {error && <p className="alert" role="alert">{error}</p>}
 
       {loading ? (
         <p className="loading" role="status">Loading your dashboard…</p>
       ) : dashboard ? (
         <>
-          <section className="panel" aria-labelledby="dashboard-title">
+          <section className="dashboard-welcome" aria-labelledby="dashboard-title">
+            <div>
+              <p className="eyebrow">Your account</p>
+              <h2 id="dashboard-title">Welcome back, {dashboard.customer.fullName}</h2>
+              <p className="muted">{dashboard.customer.email}</p>
+            </div>
+            <Link className="button" href="/products">Explore available plans</Link>
+          </section>
+          <section className="dashboard-metrics" aria-label="Policy overview">
+            <article className="metric-card">
+              <span className="metric-label">Registered policies</span>
+              <strong>{dashboard.policies.length}</strong>
+            </article>
+            <article className="metric-card">
+              <span className="metric-label">Active policies</span>
+              <strong>{dashboard.policies.filter((policy) => policy.status === "ACTIVE").length}</strong>
+            </article>
+            <article className="metric-card">
+              <span className="metric-label">Cover types</span>
+              <strong>{new Set(dashboard.policies.map((policy) => policy.policyType)).size}</strong>
+            </article>
+          </section>
+          <section className="panel" aria-labelledby="dashboard-policies-title">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Your account</p>
-                <h1 id="dashboard-title">Welcome, {dashboard.customer.fullName}</h1>
-                <p className="muted">{dashboard.customer.email}</p>
+                <p className="eyebrow">Policy portfolio</p>
+                <h2 id="dashboard-policies-title">Your registered policies</h2>
               </div>
-            </div>
-
-            <div className="section-heading">
-              <h2>Your policies</h2>
               <div className="section-actions">
-                <Link className="text-link" href="/policy">Find a policy by number</Link>
                 <span className="count">{dashboard.policies.length}</span>
               </div>
             </div>
             {dashboard.policies.length === 0 ? (
               <div className="empty-state">
                 <h3>No policies yet</h3>
-                <p>Browse available products below to register your first policy.</p>
+                <p>Explore the available plans to find a policy for your needs.</p>
+                <Link className="button" href="/products">Browse available plans</Link>
               </div>
             ) : (
               <div className="table-scroll">
@@ -149,16 +135,12 @@ export default function Dashboard() {
               </div>
             )}
           </section>
-          <AvailableProducts onRegister={handleRegistration} />
-          <Recommendations
-            dateOfBirth={dashboard.customer.dateOfBirth}
-            onRegister={handleRegistration}
-          />
+          <PolicySearch />
         </>
       ) : (
         <p className="muted">Redirecting to sign in…</p>
       )}
-    </main>
+    </div>
   );
 }
 

@@ -12,4 +12,6 @@ public interface AiRecommendationRequestRepository extends JpaRepository<AiRecom
     List<AiRecommendationRequest> findAllByCustomer_IdOrderByRequestedAtDesc(UUID customerId);
 
     Optional<AiRecommendationRequest> findByIdAndCustomer_Id(UUID id, UUID customerId);
+
+    long countByCustomer_Id(UUID customerId);
 }

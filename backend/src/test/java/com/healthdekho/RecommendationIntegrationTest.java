@@ -186,7 +186,7 @@ class RecommendationIntegrationTest {
                 ));
 
         verify(recommendationProvider, never()).recommend(any());
-        assertThat(recommendationRequestRepository.count()).isZero();
+        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isZero();
     }
 
     @Test
@@ -209,7 +209,7 @@ class RecommendationIntegrationTest {
                 .andExpect(jsonPath("$.recommendations.length()").value(0));
 
         verify(recommendationProvider, never()).recommend(any());
-        assertThat(recommendationRequestRepository.count()).isEqualTo(1);
+        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isEqualTo(1);
     }
 
     @Test
@@ -233,8 +233,8 @@ class RecommendationIntegrationTest {
                         ))))
                 .andExpect(status().isBadGateway());
 
-        assertThat(recommendationRequestRepository.count()).isZero();
-        assertThat(recommendationItemRepository.count()).isZero();
+        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isZero();
+        assertThat(recommendationItemRepository.countByRequest_Customer_Id(customer.getId())).isZero();
     }
 
     @Test
@@ -258,7 +258,7 @@ class RecommendationIntegrationTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.message").value("Recommendations are temporarily unavailable."));
 
-        assertThat(recommendationRequestRepository.count()).isZero();
+        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isZero();
     }
 
     @Test

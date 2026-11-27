@@ -170,17 +170,17 @@ The target code layout and eventual AWS services are described in [architecture-
 
 **FR alignment:** Source FR-5 / PRD FR-6 (own-policy search), plus regression verification for source FR-1 through FR-4. Marketplace product search is delivered in Sprint 4 and is not part of this search scope.
 
-**Planning notes:** The search contract in `spec.md` defines the supported criteria but does not define whether customer-name matching is exact or partial/case-insensitive. Resolve and record this before implementing the search query. The latest full backend test run also exposed PostgreSQL integration assertions that count rows across a shared database; establish a repeatable, non-destructive test baseline before using the full suite as a release gate.
+**Planning notes:** Customer-name matching is trimmed, case-insensitive partial matching, as recorded in `spec.md`. PostgreSQL fixtures use unique test data and recommendation assertions are scoped to the current customer, so tests do not depend on global row counts or truncate shared developer data.
 
 **Tasks**
 
-- [ ] S5.1 Resolve and record customer-name matching semantics in `spec.md`; make PostgreSQL integration fixtures and assertions repeatable without truncating or deleting shared developer data.
-- [ ] S5.2 Implement authenticated `GET /api/policies/search` with validated query parameters and page/size handling. Support only the source-brief modes: policy identifier; customer name; policy identifier plus date of birth. Reject blank or unsupported criteria combinations. Derive the customer ID exclusively from the authenticated principal.
-- [ ] S5.3 Add efficient customer-scoped repository/service queries and response DTOs. Return `PageResponse` metadata and policy identifier, customer name, date of birth, policy name/type, start/maturity dates, total premium payable, payment status, total premium paid, and remaining premium. Keep totals consistent with the existing payment-detail calculations and avoid per-row follow-up queries.
-- [ ] S5.4 Add the customer policy-search form to the signed-in experience, with policy identifier, customer name, and date-of-birth inputs; connect it to the API client and display paginated table results, validation errors, loading state, and an explicit no-results state.
-- [ ] S5.5 Add focused repository/service/controller and frontend tests for all supported criteria modes, unsupported/empty criteria, normalization, pagination and page-size bounds, response fields, and cross-customer isolation.
+- [x] S5.1 Resolve and record customer-name matching semantics in `spec.md`; make PostgreSQL integration fixtures and assertions repeatable without truncating or deleting shared developer data.
+- [x] S5.2 Implement authenticated `GET /api/policies/search` with validated query parameters and page/size handling. Support only the source-brief modes: policy identifier; customer name; policy identifier plus date of birth. Reject blank or unsupported criteria combinations. Derive the customer ID exclusively from the authenticated principal.
+- [x] S5.3 Add efficient customer-scoped repository/service queries and response DTOs. Return `PageResponse` metadata and policy identifier, customer name, date of birth, policy name/type, start/maturity dates, total premium payable, payment status, total premium paid, and remaining premium. Keep totals consistent with the existing payment-detail calculations and avoid per-row follow-up queries.
+- [x] S5.4 Add the customer policy-search form to the signed-in experience, with policy identifier, customer name, and date-of-birth inputs; connect it to the API client and display paginated table results, validation errors, loading state, and an explicit no-results state.
+- [x] S5.5 Add focused repository/service/controller and frontend tests for all supported criteria modes, unsupported/empty criteria, normalization, pagination and page-size bounds, response fields, and cross-customer isolation.
 - [ ] S5.6 Run local end-to-end flows for sign-in, dashboard, product search, registration, recommendations, policy-number lookup, payments, and multi-criteria policy search. Verify search results do not expose another customer's data.
-- [ ] S5.7 Run the backend suite against an isolated/repeatable PostgreSQL test setup, frontend tests, lint, typecheck, and production build; fix integration issues and update local run/test instructions.
+- [x] S5.7 Run the backend suite against a repeatable PostgreSQL test setup, frontend tests, lint, typecheck, and production build; fix integration issues and update local run/test instructions.
 
 **Search acceptance matrix**
 

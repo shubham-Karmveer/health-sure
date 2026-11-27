@@ -194,6 +194,7 @@ Marketplace product search is an agreed product-discovery addition; it is separa
 
 - Search active marketplace offers by product code, policy name, or policy type.
 - Separately search policy records owned by the authenticated customer using the source-brief criteria: policy identifier, customer name, or policy identifier with date of birth. Supplied name and date of birth are match criteria, not identity selectors.
+- Match trimmed policy identifiers exactly, customer names case-insensitively as partial text, and dates of birth exactly.
 - Product search returns the product fields required by FR-2. Own-policy search returns policy dates and financial/payment totals required by FR-5.
 - Display own-policy search results in a table with the fields specified by the source brief.
 - Never return another customer's policy, payment, or personal data.

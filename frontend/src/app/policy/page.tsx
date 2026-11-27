@@ -1,10 +1,13 @@
 import { Suspense } from "react";
+import SignedInShell from "@/components/SignedInShell";
 import PolicyDetails from "@/features/policies/PolicyDetails";
 
 export default function PolicyPage() {
   return (
-    <Suspense fallback={<main className="shell"><p className="loading">Loading policy…</p></main>}>
-      <PolicyDetails />
-    </Suspense>
+    <SignedInShell pageTitle="Payments and policy details">
+      <Suspense fallback={<p className="loading">Loading policy…</p>}>
+        <PolicyDetails />
+      </Suspense>
+    </SignedInShell>
   );
 }

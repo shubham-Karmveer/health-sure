@@ -26,10 +26,10 @@ mvn -f backend/pom.xml spring-boot:run
 
 The API health endpoint is `http://localhost:8080/actuator/health`.
 
-Run backend tests with PostgreSQL running:
+Run the backend tests with PostgreSQL running:
 
 ```powershell
-mvn -f backend/pom.xml test
+mvn -f backend/pom.xml clean test
 ```
 
 To seed the three sample customer profiles from the source brief plus an optional local demo account, set these values in the PowerShell session before starting the backend:
@@ -61,7 +61,17 @@ mvn -f backend/pom.xml spring-boot:run
 
 The example model ID uses US cross-region inference routing. Confirm the inference profile is available in your source region, submit Anthropic's one-time use-case form if prompted, and grant `bedrock:InvokeModel` for both the inference profile and its foundation model ARN. The first call with the schema may take up to 90 seconds while Bedrock compiles it. The provider uses the AWS SDK credential chain: use a local AWS profile/SSO session for development and an Elastic Beanstalk instance role after deployment. It does not configure Bedrock bearer API keys. Never place credentials in source control or frontend configuration. The production deployment remains deferred.
 
-Signed-in customers can search active available products by code, name, or type; request catalog-grounded recommendations; open their own policies by policy number; review installments; record manual payments; and see payment history. Payment recording is local-only accounting; it does not connect to a payment gateway.
+Signed-in customers can search active available products by code, name, or type; request catalog-grounded recommendations; search their own policies by policy number, customer name, or policy number plus date of birth; open a policy by policy number; review installments; record manual payments; and see payment history. Policy search is always scoped to the signed-in customer. Payment recording is local-only accounting; it does not connect to a payment gateway.
+
+## Frontend pages
+
+- `/` is the public landing page.
+- `/login` signs in an existing customer.
+- `/signup` is a UI preview only; account creation is unavailable because the backend does not provide a signup endpoint.
+- `/dashboard` shows the signed-in customer's registered policies and policy search.
+- `/products` lists available plans and starts policy registration.
+- `/recommendations` displays catalog-grounded AI recommendations.
+- `/register` remains the policy registration flow; `/policy` provides policy/payment details.
 
 ## Run the frontend
 

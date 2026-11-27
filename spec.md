@@ -229,7 +229,9 @@ The key is required, limited to 128 characters, and scoped to the authenticated 
 
 ### 4.3 Search criteria
 
-Marketplace product search supports product code, policy name, and policy type over active products available to the authenticated customer. Customer policy search supports policy identifier, customer name, and policy identifier plus date of birth, matching the source brief's search modes. Every policy search is restricted to the authenticated customer's own records; supplied name or date of birth is an additional match criterion, never an identity selector. Both searches are paginated and validate that a supported criterion is provided.
+Marketplace product search supports product code, policy name, and policy type over active products available to the authenticated customer. Customer policy search supports exactly these source-brief modes: policy identifier; customer name; and policy identifier plus date of birth. Policy identifiers are trimmed and matched exactly, customer names are trimmed and matched case-insensitively as partial text, and date of birth is matched exactly. Empty criteria and unsupported combinations are rejected. Every policy search is restricted to the authenticated customer's own records; supplied name or date of birth is an additional match criterion, never an identity selector. Both searches are paginated, with a maximum page size of 50.
+
+Policy-search payment totals use installment principal paid, consistent with policy payment details: remaining premium is total premium payable minus total premium paid. Payment status is `PAID` when all installment principal and assessed penalties are paid, `OVERDUE` when an outstanding installment is past its grace-period end date, `PARTIALLY_PAID` when an outstanding installment has a payment but is not overdue, and `PENDING` otherwise.
 
 ### 4.4 Required UI response fields
 

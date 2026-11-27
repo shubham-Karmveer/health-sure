@@ -13,7 +13,6 @@ interface RecommendationsProps {
 }
 
 export default function Recommendations({ dateOfBirth, onRegister }: RecommendationsProps) {
-  const [submittedDateOfBirth, setSubmittedDateOfBirth] = useState(dateOfBirth);
   const [insuranceGoals, setInsuranceGoals] = useState("");
   const [preferredTerm, setPreferredTerm] = useState("");
   const [preferredPolicyType, setPreferredPolicyType] = useState("");
@@ -28,7 +27,7 @@ export default function Recommendations({ dateOfBirth, onRegister }: Recommendat
     setResult(null);
     try {
       setResult(await createRecommendation({
-        dateOfBirth: submittedDateOfBirth,
+        dateOfBirth,
         insuranceGoals: insuranceGoals.trim() || undefined,
         preferredTerm: preferredTerm.trim() || undefined,
         preferredPolicyType: preferredPolicyType || undefined,
@@ -49,48 +48,47 @@ export default function Recommendations({ dateOfBirth, onRegister }: Recommendat
         </div>
       </div>
       <p className="muted">
-        Recommendations use your profile date of birth and eligible active products. Your date of birth
-        must match your account profile.
+        We use the date of birth saved in your account profile to check eligibility against active products.
       </p>
       <form className="recommendation-form" onSubmit={(event) => void handleSubmit(event)}>
-        <label htmlFor="recommendation-dob">Date of birth</label>
-        <input
-          id="recommendation-dob"
-          type="date"
-          required
-          value={submittedDateOfBirth}
-          onChange={(event) => setSubmittedDateOfBirth(event.target.value)}
-        />
-        <label htmlFor="recommendation-goals">Insurance goals or preferences</label>
-        <textarea
-          id="recommendation-goals"
-          maxLength={2000}
-          rows={3}
-          value={insuranceGoals}
-          onChange={(event) => setInsuranceGoals(event.target.value)}
-        />
-        <label htmlFor="recommendation-term">Preferred policy term</label>
-        <input
-          id="recommendation-term"
-          maxLength={100}
-          placeholder="For example, 20 years"
-          value={preferredTerm}
-          onChange={(event) => setPreferredTerm(event.target.value)}
-        />
-        <label htmlFor="recommendation-type">Insurance type</label>
-        <select
-          id="recommendation-type"
-          value={preferredPolicyType}
-          onChange={(event) => setPreferredPolicyType(event.target.value)}
-        >
-          <option value="">Any type</option>
-          <option value="TERM">Term</option>
-          <option value="HEALTH">Health</option>
-          <option value="SAVINGS">Savings</option>
-        </select>
-        <button className="button" type="submit" disabled={loading}>
-          {loading ? "Finding recommendations…" : "Get recommendations"}
-        </button>
+        <label className="recommendation-field recommendation-field-wide" htmlFor="recommendation-goals">
+          Insurance goals or preferences
+          <textarea
+            id="recommendation-goals"
+            maxLength={2000}
+            rows={3}
+            value={insuranceGoals}
+            onChange={(event) => setInsuranceGoals(event.target.value)}
+          />
+        </label>
+        <label className="recommendation-field" htmlFor="recommendation-term">
+          Preferred policy term
+          <input
+            id="recommendation-term"
+            maxLength={100}
+            placeholder="For example, 20 years"
+            value={preferredTerm}
+            onChange={(event) => setPreferredTerm(event.target.value)}
+          />
+        </label>
+        <label className="recommendation-field" htmlFor="recommendation-type">
+          Insurance type
+          <select
+            id="recommendation-type"
+            value={preferredPolicyType}
+            onChange={(event) => setPreferredPolicyType(event.target.value)}
+          >
+            <option value="">Any type</option>
+            <option value="TERM">Term</option>
+            <option value="HEALTH">Health</option>
+            <option value="SAVINGS">Savings</option>
+          </select>
+        </label>
+        <div className="recommendation-form-actions">
+          <button className="button" type="submit" disabled={loading}>
+            {loading ? "Finding recommendations…" : "Get recommendations"}
+          </button>
+        </div>
       </form>
 
       {error && <p className="alert" role="alert">{error}</p>}

@@ -44,6 +44,7 @@ describe("recommendations", () => {
   it("submits profile details, displays results, and starts registration", async () => {
     const onRegister = vi.fn();
     render(<Recommendations dateOfBirth="1990-04-15" onRegister={onRegister} />);
+    expect(screen.queryByLabelText("Date of birth")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Insurance goals or preferences"), {
       target: { value: "Family protection" },
     });

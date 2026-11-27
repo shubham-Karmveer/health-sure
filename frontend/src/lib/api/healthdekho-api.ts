@@ -46,6 +46,26 @@ export interface SearchFilters {
   policyType: string;
 }
 
+export interface PolicySearchFilters {
+  policyNumber: string;
+  customerName: string;
+  dateOfBirth: string;
+}
+
+export interface PolicySearchResult {
+  policyNumber: string;
+  customerName: string;
+  dateOfBirth: string;
+  policyName: string;
+  policyType: string;
+  startDate: string;
+  maturityDate: string;
+  totalPremiumPayable: number;
+  premiumPaymentStatus: string;
+  totalPremiumPaid: number;
+  remainingPremium: number;
+}
+
 export interface PageResponse<T> {
   content: T[];
   page: number;
@@ -206,6 +226,23 @@ export async function searchAvailableProducts(
       productCode: filters.productCode.trim() || undefined,
       policyName: filters.policyName.trim() || undefined,
       policyType: filters.policyType.trim() || undefined,
+      page,
+      size,
+    },
+  });
+  return response.data;
+}
+
+export async function searchCustomerPolicies(
+  filters: PolicySearchFilters,
+  page = 0,
+  size = 20
+): Promise<PageResponse<PolicySearchResult>> {
+  const response = await apiClient.get<PageResponse<PolicySearchResult>>("/api/policies/search", {
+    params: {
+      policyNumber: filters.policyNumber.trim() || undefined,
+      customerName: filters.customerName.trim() || undefined,
+      dateOfBirth: filters.dateOfBirth || undefined,
       page,
       size,
     },

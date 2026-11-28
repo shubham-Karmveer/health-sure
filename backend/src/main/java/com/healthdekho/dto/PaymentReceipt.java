@@ -4,6 +4,7 @@ import com.healthdekho.entity.PremiumPayment;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 public record PaymentReceipt(
         String transactionReference,
@@ -18,7 +19,7 @@ public record PaymentReceipt(
         return new PaymentReceipt(
                 payment.getTransactionReference(),
                 payment.getInstallmentNumber(),
-                payment.getPaymentDate(),
+                payment.getPaymentDate().atStartOfDay().toInstant(ZoneOffset.UTC),
                 payment.getAmountPaid(),
                 payment.getPremiumAmount(),
                 payment.getPenaltyAmount(),

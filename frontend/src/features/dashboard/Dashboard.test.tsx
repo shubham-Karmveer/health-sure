@@ -30,7 +30,7 @@ afterEach(cleanup);
 
 const dashboard: DashboardData = {
   customer: {
-    customerId: "customer-1",
+    customerId: 1,
     email: "customer@example.com",
     fullName: "Test Customer",
     dateOfBirth: "1990-04-15",

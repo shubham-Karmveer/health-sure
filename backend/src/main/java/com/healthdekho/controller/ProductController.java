@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/products")
@@ -25,7 +24,7 @@ public class ProductController {
 
     @GetMapping("/available")
     public List<AvailableProductResponse> available(@AuthenticationPrincipal Jwt jwt) {
-        return productCatalogService.findAvailableForCustomer(UUID.fromString(jwt.getSubject()));
+        return productCatalogService.findAvailableForCustomer(Long.valueOf(jwt.getSubject()));
     }
 
     @GetMapping("/search")
@@ -38,7 +37,7 @@ public class ProductController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return productCatalogService.searchAvailableForCustomer(
-                UUID.fromString(jwt.getSubject()),
+                Long.valueOf(jwt.getSubject()),
                 productCode,
                 policyName,
                 policyType,

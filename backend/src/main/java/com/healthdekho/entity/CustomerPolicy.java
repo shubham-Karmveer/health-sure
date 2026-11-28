@@ -11,19 +11,19 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Entity
-@Table(name = "customer_policy")
+@Table(name = "customer_policies")
 public class CustomerPolicy {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "policy_id")
+    private Long id;
 
-    @Column(name = "policy_number", nullable = false, unique = true, length = 50)
+    @Column(name = "policy_number", nullable = false, unique = true, length = 40)
     private String policyNumber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -34,32 +34,32 @@ public class CustomerPolicy {
     @JoinColumn(name = "product_id", nullable = false)
     private InsuranceProduct product;
 
-    @Column(name = "term_months", nullable = false)
-    private int termMonths;
+    @Column(name = "policy_term_years", nullable = false)
+    private int policyTermYears;
 
-    @Column(name = "start_date", nullable = false)
+    @Column(name = "policy_start_date", nullable = false)
     private LocalDate startDate;
 
-    @Column(name = "maturity_date", nullable = false)
+    @Column(name = "policy_maturity_date", nullable = false)
     private LocalDate maturityDate;
 
     @Column(name = "premium_frequency", nullable = false, length = 20)
     private String premiumFrequency;
 
-    @Column(name = "premium_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "premium_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal premiumAmount;
 
-    @Column(name = "sum_insured", nullable = false, precision = 19, scale = 2)
+    @Column(name = "sum_insured", nullable = false, precision = 15, scale = 2)
     private BigDecimal sumInsured;
 
-    @Column(name = "total_premium_payable", nullable = false, precision = 19, scale = 2)
+    @Column(name = "total_premium_payable", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalPremiumPayable;
 
-    @Column(nullable = false, length = 30)
+    @Column(name = "policy_status", length = 20)
     private String status;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     protected CustomerPolicy() {
     }
@@ -71,7 +71,10 @@ public class CustomerPolicy {
         this.policyNumber = policyNumber;
         this.customer = customer;
         this.product = product;
-        this.termMonths = termMonths;
+        if (termMonths <= 0 || termMonths % 12 != 0) {
+            throw new IllegalArgumentException("Policy terms must be a positive whole number of years.");
+        }
+        this.policyTermYears = termMonths / 12;
         this.startDate = startDate;
         this.maturityDate = maturityDate;
         this.premiumFrequency = premiumFrequency;
@@ -79,10 +82,9 @@ public class CustomerPolicy {
         this.sumInsured = sumInsured;
         this.totalPremiumPayable = totalPremiumPayable;
         this.status = status;
-        this.createdAt = Instant.now();
     }
 
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 
@@ -99,7 +101,7 @@ public class CustomerPolicy {
     }
 
     public int getTermMonths() {
-        return termMonths;
+        return policyTermYears * 12;
     }
 
     public LocalDate getStartDate() {
@@ -130,7 +132,7 @@ public class CustomerPolicy {
         return status;
     }
 
-    public Instant getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 }

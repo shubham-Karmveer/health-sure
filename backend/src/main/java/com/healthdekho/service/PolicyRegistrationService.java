@@ -45,7 +45,7 @@ public class PolicyRegistrationService {
     }
 
     @Transactional
-    public PolicyRegistrationResponse register(UUID customerId, PolicyRegistrationRequest request) {
+    public PolicyRegistrationResponse register(Long customerId, PolicyRegistrationRequest request) {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         InsuranceProduct product = productRepository.findByProductCodeAndActiveTrue(request.productCode().trim())
@@ -76,7 +76,7 @@ public class PolicyRegistrationService {
         BigDecimal totalPremiumPayable = product.getPremiumAmount()
                 .multiply(BigDecimal.valueOf(installmentCount))
                 .setScale(2, RoundingMode.UNNECESSARY);
-        if (totalPremiumPayable.precision() > 19) {
+        if (totalPremiumPayable.precision() > 15) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "The selected product has an invalid premium schedule."
@@ -84,7 +84,7 @@ public class PolicyRegistrationService {
         }
         LocalDate maturityDate = request.startDate().plusMonths(termMonths).minusDays(1);
         CustomerPolicy policy = policyRepository.save(new CustomerPolicy(
-                "HD-POL-" + UUID.randomUUID(),
+                "HD-POL-" + UUID.randomUUID().toString().replace("-", ""),
                 customer,
                 product,
                 termMonths,

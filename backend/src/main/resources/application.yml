@@ -16,8 +16,8 @@ spring:
             model: ${BEDROCK_MODEL_ID:us.anthropic.claude-haiku-4-5-20251001-v1:0}
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/healthdekho}
-    username: ${DATABASE_USERNAME:capstoneproject}
-    password: ${DATABASE_PASSWORD:capstoneproject_password}
+    username: ${DATABASE_USERNAME:healthdekho_dev}
+    password: ${DATABASE_PASSWORD:healthdekho_dev_password}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
@@ -28,7 +28,7 @@ spring:
         jdbc:
           time_zone: UTC
   flyway:
-    enabled: true
+    enabled: false
 
 management:
   endpoints:
@@ -41,6 +41,10 @@ management:
         enabled: true
 
 app:
+  auth:
+    demo:
+      email: ${DEMO_LOGIN_EMAIL:}
+      password: ${DEMO_LOGIN_PASSWORD:}
   jwt:
     secret: ${JWT_SECRET:healthdekho-local-only-signing-key-change-before-production}
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
@@ -52,7 +56,7 @@ app:
       email: ${SEED_CUSTOMER_EMAIL:}
       password: ${SEED_CUSTOMER_PASSWORD:}
     catalog:
-      enabled: ${SEED_CATALOG_ENABLED:true}
+      enabled: ${SEED_CATALOG_ENABLED:false}
   ai:
     provider: ${AI_PROVIDER:stub}
     model-name: ${AI_MODEL_NAME:healthdekho-local-stub}

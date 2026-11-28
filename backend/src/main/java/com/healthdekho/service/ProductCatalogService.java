@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ProductCatalogService {
@@ -23,7 +22,7 @@ public class ProductCatalogService {
     }
 
     @Transactional(readOnly = true)
-    public List<AvailableProductResponse> findAvailableForCustomer(UUID customerId) {
+    public List<AvailableProductResponse> findAvailableForCustomer(Long customerId) {
         return productRepository.findAvailableForCustomer(customerId)
                 .stream()
                 .map(AvailableProductResponse::from)
@@ -32,7 +31,7 @@ public class ProductCatalogService {
 
     @Transactional(readOnly = true)
     public PageResponse<AvailableProductResponse> searchAvailableForCustomer(
-            UUID customerId,
+            Long customerId,
             String productCode,
             String policyName,
             String policyType,

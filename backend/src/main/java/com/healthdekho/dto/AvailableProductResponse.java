@@ -3,10 +3,9 @@ package com.healthdekho.dto;
 import com.healthdekho.entity.InsuranceProduct;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 public record AvailableProductResponse(
-        UUID productId,
+        Long productId,
         String productCode,
         String policyName,
         String policyType,

@@ -9,42 +9,39 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
-public interface PremiumInstallmentRepository extends JpaRepository<PremiumInstallment, UUID> {
+public interface PremiumInstallmentRepository extends JpaRepository<PremiumInstallment, Long> {
 
-    List<PremiumInstallment> findAllByPolicy_IdOrderByInstallmentNumberAsc(UUID policyId);
+    List<PremiumInstallment> findAllByPolicy_IdOrderByInstallmentNumberAsc(Long policyId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<PremiumInstallment> findAllByPolicy_IdAndInstallmentNumberInOrderByInstallmentNumberAsc(
-            UUID policyId,
+            Long policyId,
             List<Integer> installmentNumbers
     );
 
-    @Query("""
-            select installment.policy.id as policyId,
-                   sum(installment.paidAmount) as premiumPaid,
-                   count(case
-                       when installment.paidAmount < installment.scheduledAmount
-                         or installment.paidPenaltyAmount < installment.penaltyAmount
-                       then installment.id else null
-                   end) as incompleteInstallments,
-                   count(case
-                       when installment.gracePeriodEndDate < :asOfDate
-                        and (installment.paidAmount < installment.scheduledAmount
-                          or installment.paidPenaltyAmount < installment.penaltyAmount)
-                       then installment.id else null
-                   end) as overdueInstallments,
-                   count(case
-                       when installment.paidAmount > 0 or installment.paidPenaltyAmount > 0
-                       then installment.id else null
-                   end) as installmentsWithPayment
-            from PremiumInstallment installment
-            where installment.policy.id in :policyIds
-            group by installment.policy.id
-            """)
+    @Query(value = """
+            select cp.policy_id as "policyId",
+                   coalesce(sum(payment.premium_paid), 0) as "premiumPaid",
+                   count(distinct case
+                       when coalesce(installment.amount_paid, 0)
+                            < installment.premium_amount + coalesce(installment.penalty_amount, 0)
+                       then installment.installment_id end) as "incompleteInstallments",
+                   count(distinct case
+                       when installment.grace_period_end_date < :asOfDate
+                        and coalesce(installment.amount_paid, 0)
+                            < installment.premium_amount + coalesce(installment.penalty_amount, 0)
+                       then installment.installment_id end) as "overdueInstallments",
+                   count(distinct case
+                       when installment.amount_paid > 0 then installment.installment_id end) as "installmentsWithPayment"
+            from customer_policies cp
+            join premium_installments installment on installment.policy_id = cp.policy_id
+            left join premium_payments payment on payment.installment_id = installment.installment_id
+            where cp.policy_id in (:policyIds)
+            group by cp.policy_id
+            """, nativeQuery = true)
     List<PolicyPaymentSummaryProjection> summarizePaymentsByPolicy(
-            @Param("policyIds") List<UUID> policyIds,
+            @Param("policyIds") List<Long> policyIds,
             @Param("asOfDate") LocalDate asOfDate
     );
 }

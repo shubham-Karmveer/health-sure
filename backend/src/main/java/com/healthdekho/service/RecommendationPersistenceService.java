@@ -2,28 +2,29 @@ package com.healthdekho.service;
 
 import com.healthdekho.dto.RecommendationItemResponse;
 import com.healthdekho.dto.RecommendationResponse;
-import com.healthdekho.entity.AiRecommendationItem;
-import com.healthdekho.entity.AiRecommendationRequest;
 import com.healthdekho.entity.Customer;
 import com.healthdekho.entity.InsuranceProduct;
-import com.healthdekho.repository.AiRecommendationItemRepository;
-import com.healthdekho.repository.AiRecommendationRequestRepository;
+import com.healthdekho.entity.PolicyRecommendation;
 import com.healthdekho.repository.CustomerRepository;
 import com.healthdekho.repository.InsuranceProductRepository;
+import com.healthdekho.repository.PolicyRecommendationRepository;
 import com.healthdekho.recommendation.RecommendationProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,29 +35,26 @@ public class RecommendationPersistenceService {
 
     private final CustomerRepository customerRepository;
     private final InsuranceProductRepository productRepository;
-    private final AiRecommendationRequestRepository requestRepository;
-    private final AiRecommendationItemRepository itemRepository;
+    private final PolicyRecommendationRepository recommendationRepository;
 
     public RecommendationPersistenceService(
             CustomerRepository customerRepository,
             InsuranceProductRepository productRepository,
-            AiRecommendationRequestRepository requestRepository,
-            AiRecommendationItemRepository itemRepository
+            PolicyRecommendationRepository recommendationRepository
     ) {
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
-        this.requestRepository = requestRepository;
-        this.itemRepository = itemRepository;
+        this.recommendationRepository = recommendationRepository;
     }
 
     @Transactional
     public RecommendationResponse save(
-            UUID customerId,
+            Long customerId,
             PreparedRecommendation prepared,
             RecommendationProvider.Metadata metadata,
             List<RecommendationProvider.Suggestion> suggestions
     ) {
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository.findByIdForUpdate(customerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!customer.getDateOfBirth().equals(prepared.dateOfBirth())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Customer profile changed; request recommendations again.");
@@ -81,40 +79,56 @@ public class RecommendationPersistenceService {
                 preparedCodes,
                 currentByCode
         );
+        if (metadata.modelName() == null || metadata.modelName().isBlank() || metadata.modelName().length() > 100) {
+            throw new IllegalStateException("Recommendation model name must fit the supplied schema's 100-character limit.");
+        }
 
-        AiRecommendationRequest request = requestRepository.saveAndFlush(new AiRecommendationRequest(
-                customer,
-                prepared.dateOfBirth(),
-                prepared.insuranceGoals(),
-                prepared.preferredTerm(),
-                prepared.preferredPolicyType(),
-                age,
-                metadata.modelName(),
-                metadata.modelVersion(),
-                metadata.promptVersion()
-        ));
-        List<AiRecommendationItem> persistedItems = java.util.stream.IntStream.range(0, validatedSuggestions.size())
-                .mapToObj(index -> {
-                    RecommendationProvider.Suggestion suggestion = validatedSuggestions.get(index);
-                    return new AiRecommendationItem(
-                        request,
+        LocalDateTime requestedAt = nextRequestTimestamp(customerId);
+        List<PolicyRecommendation> persisted = validatedSuggestions.stream()
+                .map(suggestion -> new PolicyRecommendation(
+                        customer,
                         currentByCode.get(suggestion.productCode()),
-                        index + 1,
+                        prepared.insuranceGoals(),
+                        age,
                         suggestion.recommendationReason().trim(),
                         suggestion.suitability().toUpperCase(Locale.ROOT),
-                        false
-                    );
-                })
+                        metadata.modelName(),
+                        requestedAt
+                ))
                 .toList();
-        List<AiRecommendationItem> savedItems = itemRepository.saveAll(persistedItems);
-        return response(request, savedItems);
+        List<PolicyRecommendation> saved = recommendationRepository.saveAllAndFlush(persisted);
+        return response(
+                saved.isEmpty() ? null : saved.get(0).getId(),
+                customer.getDateOfBirth(),
+                age,
+                prepared.insuranceGoals(),
+                metadata.modelName(),
+                requestedAt.toInstant(ZoneOffset.UTC),
+                saved
+        );
     }
 
     @Transactional(readOnly = true)
-    public RecommendationResponse get(UUID customerId, UUID requestId) {
-        AiRecommendationRequest request = requestRepository.findByIdAndCustomer_Id(requestId, customerId)
+    public RecommendationResponse get(Long customerId, Long recommendationId) {
+        PolicyRecommendation first = recommendationRepository.findByIdAndCustomer_Id(recommendationId, customerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        return response(request, itemRepository.findAllByRequest_IdOrderByRankOrderAsc(requestId));
+        List<PolicyRecommendation> group = recommendationRepository
+                .findAllByCustomer_IdAndCustomerGoalAndCustomerAgeAndAiModelAndCreatedAtOrderByIdAsc(
+                        customerId,
+                        first.getCustomerGoal(),
+                        first.getCustomerAge(),
+                        first.getAiModel(),
+                        first.getCreatedAt()
+                );
+        return response(
+                first.getId(),
+                first.getCustomer().getDateOfBirth(),
+                first.getCustomerAge(),
+                first.getCustomerGoal(),
+                first.getAiModel(),
+                first.getCreatedAt().toInstant(ZoneOffset.UTC),
+                group
+        );
     }
 
     private List<RecommendationProvider.Suggestion> validateSuggestions(
@@ -155,24 +169,32 @@ public class RecommendationPersistenceService {
         );
     }
 
+    private LocalDateTime nextRequestTimestamp(Long customerId) {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+        return recommendationRepository.findFirstByCustomer_IdOrderByCreatedAtDesc(customerId)
+                .map(last -> now.isAfter(last.getCreatedAt()) ? now : last.getCreatedAt().plusNanos(1_000))
+                .orElse(now);
+    }
+
     private RecommendationResponse response(
-            AiRecommendationRequest request,
-            List<AiRecommendationItem> items
+            Long requestId,
+            LocalDate dateOfBirth,
+            int age,
+            String goals,
+            String modelName,
+            Instant requestedAt,
+            List<PolicyRecommendation> items
     ) {
-        List<RecommendationItemResponse> recommendationItems = items.stream()
-                .map(RecommendationItemResponse::from)
+        List<RecommendationItemResponse> recommendationItems = java.util.stream.IntStream.range(0, items.size())
+                .mapToObj(index -> RecommendationItemResponse.from(items.get(index), index + 1))
                 .toList();
         return new RecommendationResponse(
-                request.getId(),
-                request.getDateOfBirth(),
-                request.getCalculatedAge(),
-                request.getInsuranceGoals(),
-                request.getPreferredTerm(),
-                request.getPreferredPolicyType(),
-                request.getModelName(),
-                request.getModelVersion(),
-                request.getPromptVersion(),
-                request.getRequestedAt(),
+                requestId,
+                dateOfBirth,
+                age,
+                goals,
+                modelName,
+                requestedAt,
                 recommendationItems
         );
     }

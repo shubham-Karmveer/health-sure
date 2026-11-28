@@ -10,6 +10,9 @@ import com.healthdekho.repository.CustomerPolicyRepository;
 import com.healthdekho.repository.CustomerRepository;
 import com.healthdekho.repository.InsuranceProductRepository;
 import com.healthdekho.repository.PremiumInstallmentRepository;
+import com.healthdekho.repository.PremiumPaymentRepository;
+import com.healthdekho.entity.PremiumPayment;
+import com.healthdekho.service.JwtTokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +56,12 @@ class PolicySearchIntegrationTest {
 
     @Autowired
     private PremiumInstallmentRepository installmentRepository;
+
+    @Autowired
+    private PremiumPaymentRepository paymentRepository;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -187,7 +196,7 @@ class PolicySearchIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 name,
                 dateOfBirth,
-                null,
+                "5550101",
                 "ACTIVE"
         ));
     }
@@ -195,7 +204,7 @@ class PolicySearchIntegrationTest {
     private CustomerPolicy createPolicy(Customer customer, BigDecimal firstInstallmentPayment) {
         String suffix = UUID.randomUUID().toString();
         InsuranceProduct product = productRepository.save(new InsuranceProduct(
-                "PS-" + suffix.substring(0, 30),
+                "PS-" + suffix.substring(0, 27),
                 "Policy Search Product " + suffix.substring(0, 8),
                 "HEALTH",
                 12,
@@ -208,7 +217,7 @@ class PolicySearchIntegrationTest {
         ));
         LocalDate startDate = LocalDate.now();
         CustomerPolicy policy = policyRepository.save(new CustomerPolicy(
-                "HD-PS-" + suffix,
+                "HD-PS-" + suffix.replace("-", ""),
                 customer,
                 product,
                 12,
@@ -230,19 +239,22 @@ class PolicySearchIntegrationTest {
                 policy, 2, startDate.plusMonths(1), startDate.plusMonths(2), new BigDecimal("600.00")
         );
         installmentRepository.saveAll(List.of(firstInstallment, secondInstallment));
+        if (firstInstallmentPayment.signum() > 0) {
+            paymentRepository.save(new PremiumPayment(
+                    firstInstallment,
+                    "TEST-RECEIPT-" + suffix.substring(0, 20),
+                    "TEST-TXN-" + suffix.substring(0, 20),
+                    firstInstallmentPayment,
+                    BigDecimal.ZERO,
+                    "TEST"
+            ));
+        }
         return policy;
     }
 
     private Cookie loginAndGetAuthCookie(String email) throws Exception {
-        CsrfFixture csrf = getCsrfFixture();
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .cookie(csrf.cookie())
-                        .header(csrf.headerName(), csrf.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(new LoginPayload(email, PASSWORD))))
-                .andExpect(status().isOk())
-                .andReturn();
-        return result.getResponse().getCookie("HD_ACCESS_TOKEN");
+        Customer customer = customerRepository.findByEmailIgnoreCase(email).orElseThrow();
+        return new Cookie("HD_ACCESS_TOKEN", jwtTokenService.issueFor(customer));
     }
 
     private CsrfFixture getCsrfFixture() throws Exception {

@@ -63,7 +63,7 @@ public class LocalCustomerSeeder implements ApplicationRunner {
         SampleCustomer configuredCustomer = sampleCustomers.stream()
                 .filter(customer -> customer.email().equalsIgnoreCase(email))
                 .findFirst()
-                .orElse(new SampleCustomer(email, "Local Demo Customer", LocalDate.of(1990, 1, 1), null));
+                .orElse(new SampleCustomer(email, "Local Demo Customer", LocalDate.of(1990, 1, 1), "0000000000"));
 
         seedCustomer(configuredCustomer);
         sampleCustomers.stream()

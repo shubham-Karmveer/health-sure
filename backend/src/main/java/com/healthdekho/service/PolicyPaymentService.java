@@ -1,7 +1,5 @@
 package com.healthdekho.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.healthdekho.dto.InstallmentDetailResponse;
 import com.healthdekho.dto.PaymentBatchResponse;
 import com.healthdekho.dto.PaymentHistoryResponse;
@@ -11,12 +9,10 @@ import com.healthdekho.dto.PaymentRequest;
 import com.healthdekho.dto.PolicyDetailsResponse;
 import com.healthdekho.entity.Customer;
 import com.healthdekho.entity.CustomerPolicy;
-import com.healthdekho.entity.PaymentIdempotencyRecord;
 import com.healthdekho.entity.PremiumInstallment;
 import com.healthdekho.entity.PremiumPayment;
 import com.healthdekho.repository.CustomerPolicyRepository;
 import com.healthdekho.repository.CustomerRepository;
-import com.healthdekho.repository.PaymentIdempotencyRepository;
 import com.healthdekho.repository.PremiumInstallmentRepository;
 import com.healthdekho.repository.PremiumPaymentRepository;
 import org.springframework.http.HttpStatus;
@@ -34,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -51,55 +46,31 @@ public class PolicyPaymentService {
     private final CustomerPolicyRepository policyRepository;
     private final PremiumInstallmentRepository installmentRepository;
     private final PremiumPaymentRepository paymentRepository;
-    private final PaymentIdempotencyRepository idempotencyRepository;
-    private final ObjectMapper objectMapper;
 
     public PolicyPaymentService(
             CustomerRepository customerRepository,
             CustomerPolicyRepository policyRepository,
             PremiumInstallmentRepository installmentRepository,
-            PremiumPaymentRepository paymentRepository,
-            PaymentIdempotencyRepository idempotencyRepository,
-            ObjectMapper objectMapper
+            PremiumPaymentRepository paymentRepository
     ) {
         this.customerRepository = customerRepository;
         this.policyRepository = policyRepository;
         this.installmentRepository = installmentRepository;
         this.paymentRepository = paymentRepository;
-        this.idempotencyRepository = idempotencyRepository;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional
     public PaymentBatchResponse recordPayments(
-            UUID customerId,
+            Long customerId,
             String policyNumber,
             String idempotencyKey,
             PaymentRequest request
     ) {
         String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
         String paymentMethod = request.paymentMethod().trim();
-        String requestHash = requestHash(policyNumber, paymentMethod, request.payments());
-
-        Customer customer = customerRepository.findByIdForUpdate(customerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        var existingRequest = idempotencyRepository
-                .findByCustomer_IdAndIdempotencyKey(customerId, normalizedKey);
-        if (existingRequest.isPresent()) {
-            PaymentIdempotencyRecord record = existingRequest.get();
-            if (!record.getRequestHash().equals(requestHash)) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "This idempotency key was already used for a different payment request."
-                );
-            }
-            return readCachedResponse(record);
+        if (paymentMethod.isEmpty() || paymentMethod.length() > 30) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method must be 1 to 30 characters.");
         }
-
-        CustomerPolicy policy = policyRepository
-                .findForUpdateByPolicyNumberAndCustomerId(policyNumber, customerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-
         Set<Integer> installmentNumbers = request.payments().stream()
                 .map(PaymentLineRequest::installmentNumber)
                 .collect(Collectors.toSet());
@@ -108,6 +79,25 @@ public class PolicyPaymentService {
                     HttpStatus.BAD_REQUEST,
                     "Each installment may appear only once in a payment request."
             );
+        }
+        Customer customer = customerRepository.findByIdForUpdate(customerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        CustomerPolicy policy = policyRepository
+                .findForUpdateByPolicyNumberAndCustomerId(policyNumber, customerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String receiptNumber = receiptNumber(customer.getId(), normalizedKey);
+        List<PremiumPayment> priorPayments =
+                paymentRepository.findAllByReceiptNumberOrderByInstallment_InstallmentNumberAsc(receiptNumber);
+        if (!priorPayments.isEmpty()) {
+            if (!matchesRequest(policy, priorPayments, paymentMethod, request.payments())) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "This idempotency key was already used for a different payment request."
+                );
+            }
+            List<PremiumInstallment> policyInstallments =
+                    updateAndLoadInstallments(policy, LocalDate.now());
+            return paymentResponse(policy, policyInstallments, priorPayments);
         }
 
         List<Integer> sortedNumbers = installmentNumbers.stream().sorted().toList();
@@ -131,9 +121,6 @@ public class PolicyPaymentService {
                 .map(line -> planPayment(installmentByNumber.get(line.installmentNumber()), line, today))
                 .toList();
 
-        PaymentIdempotencyRecord idempotencyRecord = idempotencyRepository.save(
-                new PaymentIdempotencyRecord(customer, policy, normalizedKey, requestHash)
-        );
         List<PremiumPayment> payments = new ArrayList<>(paymentPlans.size());
         for (PaymentPlan plan : paymentPlans) {
             if (plan.penaltyToAssess().signum() > 0) {
@@ -143,9 +130,8 @@ public class PolicyPaymentService {
             plan.installment().updatePaymentStatus(today);
             payments.add(new PremiumPayment(
                     plan.installment(),
-                    idempotencyRecord,
+                    receiptNumber,
                     "HD-TXN-" + UUID.randomUUID(),
-                    plan.amountPaid(),
                     plan.premiumAmount(),
                     plan.penaltyAmount(),
                     paymentMethod
@@ -153,14 +139,11 @@ public class PolicyPaymentService {
         }
         installmentRepository.saveAll(installments);
         List<PremiumPayment> savedPayments = paymentRepository.saveAll(payments);
-        PaymentBatchResponse response = paymentResponse(policy, installments, savedPayments);
-        idempotencyRecord.setResponseJson(writeCachedResponse(response));
-        idempotencyRepository.save(idempotencyRecord);
-        return response;
+        return paymentResponse(policy, installments, savedPayments);
     }
 
     @Transactional
-    public PolicyDetailsResponse getPolicyDetails(UUID customerId, String policyNumber) {
+    public PolicyDetailsResponse getPolicyDetails(Long customerId, String policyNumber) {
         CustomerPolicy policy = ownedPolicy(customerId, policyNumber);
         LocalDate today = LocalDate.now();
         List<PremiumInstallment> installments = updateAndLoadInstallments(policy, today);
@@ -193,7 +176,7 @@ public class PolicyPaymentService {
     }
 
     @Transactional
-    public List<InstallmentDetailResponse> getInstallments(UUID customerId, String policyNumber) {
+    public List<InstallmentDetailResponse> getInstallments(Long customerId, String policyNumber) {
         CustomerPolicy policy = ownedPolicy(customerId, policyNumber);
         LocalDate today = LocalDate.now();
         return updateAndLoadInstallments(policy, today).stream()
@@ -202,7 +185,7 @@ public class PolicyPaymentService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentHistoryResponse> getPaymentHistory(UUID customerId, String policyNumber) {
+    public List<PaymentHistoryResponse> getPaymentHistory(Long customerId, String policyNumber) {
         CustomerPolicy policy = ownedPolicy(customerId, policyNumber);
         return paymentRepository.findAllByInstallment_Policy_IdOrderByPaymentDateDesc(policy.getId())
                 .stream()
@@ -236,6 +219,12 @@ public class PolicyPaymentService {
 
         BigDecimal penaltyPaid = line.amountPaid().min(penaltyOutstanding);
         BigDecimal premiumPaid = line.amountPaid().subtract(penaltyPaid);
+        if (premiumPaid.signum() <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Each payment must include a positive premium amount."
+            );
+        }
         return new PaymentPlan(
                 installment,
                 line.amountPaid(),
@@ -268,7 +257,7 @@ public class PolicyPaymentService {
         return ZERO;
     }
 
-    private CustomerPolicy ownedPolicy(UUID customerId, String policyNumber) {
+    private CustomerPolicy ownedPolicy(Long customerId, String policyNumber) {
         return policyRepository.findByPolicyNumberAndCustomer_Id(policyNumber, customerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
@@ -325,38 +314,34 @@ public class PolicyPaymentService {
         return idempotencyKey.trim();
     }
 
-    private String requestHash(String policyNumber, String paymentMethod, List<PaymentLineRequest> payments) {
-        String paymentLines = payments.stream()
-                .sorted(Comparator.comparingInt(PaymentLineRequest::installmentNumber))
-                .map(line -> line.installmentNumber() + ":"
-                        + line.amountPaid().stripTrailingZeros().toPlainString())
-                .collect(Collectors.joining("|"));
-        String canonicalRequest = policyNumber + "\n"
-                + paymentMethod.toUpperCase(Locale.ROOT) + "\n"
-                + paymentLines;
+    private String receiptNumber(Long customerId, String idempotencyKey) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(canonicalRequest.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
+                    .digest((customerId + ":" + idempotencyKey).getBytes(StandardCharsets.UTF_8));
+            return "HD-" + HexFormat.of().formatHex(digest, 0, 20);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is required for payment idempotency.", exception);
+            throw new IllegalStateException("SHA-256 is required for payment receipts.", exception);
         }
     }
 
-    private PaymentBatchResponse readCachedResponse(PaymentIdempotencyRecord record) {
-        try {
-            return objectMapper.readValue(record.getResponseJson(), PaymentBatchResponse.class);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("A stored payment idempotency response could not be read.", exception);
+    private boolean matchesRequest(
+            CustomerPolicy policy,
+            List<PremiumPayment> priorPayments,
+            String paymentMethod,
+            List<PaymentLineRequest> requestedPayments
+    ) {
+        if (priorPayments.size() != requestedPayments.size()
+                || priorPayments.stream().anyMatch(payment ->
+                        !payment.getInstallmentPolicyId().equals(policy.getId())
+                                || !paymentMethod.equals(payment.getPaymentMethod()))) {
+            return false;
         }
-    }
-
-    private String writeCachedResponse(PaymentBatchResponse response) {
-        try {
-            return objectMapper.writeValueAsString(response);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("The payment idempotency response could not be stored.", exception);
-        }
+        Map<Integer, PremiumPayment> priorByInstallment = priorPayments.stream()
+                .collect(Collectors.toMap(PremiumPayment::getInstallmentNumber, Function.identity()));
+        return requestedPayments.stream().allMatch(line -> {
+            PremiumPayment prior = priorByInstallment.get(line.installmentNumber());
+            return prior != null && prior.getAmountPaid().compareTo(line.amountPaid()) == 0;
+        });
     }
 
     private record PaymentPlan(

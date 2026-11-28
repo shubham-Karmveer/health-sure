@@ -18,7 +18,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -41,7 +40,7 @@ public class PolicySearchService {
 
     @Transactional(readOnly = true)
     public PageResponse<PolicySearchResultResponse> search(
-            UUID customerId,
+            Long customerId,
             String policyNumber,
             String customerName,
             LocalDate dateOfBirth,
@@ -69,8 +68,8 @@ public class PolicySearchService {
                     customerId, normalizedCustomerName, pageRequest);
         }
 
-        List<UUID> policyIds = policyPage.getContent().stream().map(CustomerPolicy::getId).toList();
-        Map<UUID, PolicyPaymentSummaryProjection> paymentSummaries = policyIds.isEmpty()
+        List<Long> policyIds = policyPage.getContent().stream().map(CustomerPolicy::getId).toList();
+        Map<Long, PolicyPaymentSummaryProjection> paymentSummaries = policyIds.isEmpty()
                 ? Map.of()
                 : installmentRepository.summarizePaymentsByPolicy(policyIds, LocalDate.now())
                         .stream()
@@ -140,8 +139,8 @@ public class PolicySearchService {
                     "Search by policy identifier, customer name, or policy identifier and date of birth."
             );
         }
-        if (policyNumber != null && policyNumber.length() > 50) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Policy identifier exceeds 50 characters.");
+        if (policyNumber != null && policyNumber.length() > 40) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Policy identifier exceeds 40 characters.");
         }
         if (customerName != null && customerName.length() > 120) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Customer name exceeds 120 characters.");

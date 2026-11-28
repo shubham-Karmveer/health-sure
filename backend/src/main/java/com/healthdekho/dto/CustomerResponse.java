@@ -3,10 +3,9 @@ package com.healthdekho.dto;
 import com.healthdekho.entity.Customer;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 public record CustomerResponse(
-        UUID customerId,
+        Long customerId,
         String email,
         String fullName,
         LocalDate dateOfBirth,

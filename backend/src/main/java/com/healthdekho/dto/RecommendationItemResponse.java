@@ -1,13 +1,12 @@
 package com.healthdekho.dto;
 
-import com.healthdekho.entity.AiRecommendationItem;
+import com.healthdekho.entity.PolicyRecommendation;
 import com.healthdekho.entity.InsuranceProduct;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 public record RecommendationItemResponse(
-        UUID productId,
+        Long productId,
         String productCode,
         String policyName,
         String policyType,
@@ -20,7 +19,7 @@ public record RecommendationItemResponse(
         String suitability,
         boolean selectedForRegistration
 ) {
-    public static RecommendationItemResponse from(AiRecommendationItem item) {
+    public static RecommendationItemResponse from(PolicyRecommendation item, int rankOrder) {
         InsuranceProduct product = item.getProduct();
         return new RecommendationItemResponse(
                 product.getId(),
@@ -31,10 +30,10 @@ public record RecommendationItemResponse(
                 product.getPremiumFrequency(),
                 product.getPremiumAmount(),
                 product.getSumInsured(),
-                item.getRankOrder(),
+                rankOrder,
                 item.getRecommendationReason(),
-                item.getSuitability(),
-                item.isSelectedForRegistration()
+                item.getSuitabilityDescription(),
+                false
         );
     }
 }

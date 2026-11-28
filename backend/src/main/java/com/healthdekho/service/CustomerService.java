@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class CustomerService {
@@ -28,14 +27,14 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
-    public CustomerResponse getProfile(UUID customerId) {
+    public CustomerResponse getProfile(Long customerId) {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return CustomerResponse.from(customer);
     }
 
     @Transactional(readOnly = true)
-    public List<PolicySummaryResponse> getPolicies(UUID customerId) {
+    public List<PolicySummaryResponse> getPolicies(Long customerId) {
         return customerPolicyRepository.findAllByCustomer_IdOrderByCreatedAtDesc(customerId)
                 .stream()
                 .map(PolicySummaryResponse::from)

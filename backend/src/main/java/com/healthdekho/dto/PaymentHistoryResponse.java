@@ -4,6 +4,7 @@ import com.healthdekho.entity.PremiumPayment;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 public record PaymentHistoryResponse(
         String transactionReference,
@@ -17,7 +18,7 @@ public record PaymentHistoryResponse(
     public static PaymentHistoryResponse from(PremiumPayment payment) {
         return new PaymentHistoryResponse(
                 payment.getTransactionReference(),
-                payment.getPaymentDate(),
+                payment.getPaymentDate().atStartOfDay().toInstant(ZoneOffset.UTC),
                 payment.getInstallmentNumber(),
                 payment.getAmountPaid(),
                 payment.getPremiumAmount(),

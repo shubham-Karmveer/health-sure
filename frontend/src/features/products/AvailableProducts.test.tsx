@@ -16,7 +16,7 @@ vi.mock("@/lib/api/healthdekho-api", () => ({
 afterEach(cleanup);
 
 const product = {
-  productId: "product-1",
+  productId: 1,
   productCode: "HD-TERM-001",
   policyName: "HealthDekho Secure Term",
   policyType: "TERM",

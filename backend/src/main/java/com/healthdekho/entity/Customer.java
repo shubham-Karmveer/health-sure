@@ -5,45 +5,44 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "customer_account")
+@Table(name = "customers")
 public class Customer {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "customer_id")
+    private Long id;
 
-    @Column(nullable = false, unique = true, length = 254)
+    @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 100)
+    @Transient
     private String passwordHash;
 
-    @Column(name = "full_name", nullable = false, length = 120)
-    private String fullName;
+    @Column(name = "customer_name", nullable = false, length = 100)
+    private String customerName;
 
     @Column(name = "date_of_birth", nullable = false)
     private LocalDate dateOfBirth;
 
-    @Column(length = 30)
+    @Column(name = "phone_number", nullable = false, length = 15)
     private String phone;
 
-    @Column(nullable = false, length = 20)
+    @Transient
     private String status;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "address", length = 250)
+    private String address;
 
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     protected Customer() {
     }
@@ -52,25 +51,13 @@ public class Customer {
                     String phone, String status) {
         this.email = email.trim().toLowerCase();
         this.passwordHash = passwordHash;
-        this.fullName = fullName;
+        this.customerName = fullName;
         this.dateOfBirth = dateOfBirth;
         this.phone = phone;
         this.status = status;
     }
 
-    @PrePersist
-    void onCreate() {
-        Instant now = Instant.now();
-        createdAt = now;
-        updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        updatedAt = Instant.now();
-    }
-
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 
@@ -83,7 +70,7 @@ public class Customer {
     }
 
     public String getFullName() {
-        return fullName;
+        return customerName;
     }
 
     public LocalDate getDateOfBirth() {
@@ -95,6 +82,6 @@ public class Customer {
     }
 
     public String getStatus() {
-        return status;
+        return status == null ? "ACTIVE" : status;
     }
 }

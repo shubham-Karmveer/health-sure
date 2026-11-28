@@ -4,13 +4,12 @@ import com.healthdekho.entity.PremiumPayment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.UUID;
 
-public interface PremiumPaymentRepository extends JpaRepository<PremiumPayment, UUID> {
+public interface PremiumPaymentRepository extends JpaRepository<PremiumPayment, Long> {
 
-    List<PremiumPayment> findAllByIdempotencyRecord_IdOrderByInstallment_InstallmentNumberAsc(UUID idempotencyId);
+    List<PremiumPayment> findAllByReceiptNumberOrderByInstallment_InstallmentNumberAsc(String receiptNumber);
 
-    List<PremiumPayment> findAllByInstallment_Policy_IdOrderByPaymentDateDesc(UUID policyId);
+    List<PremiumPayment> findAllByInstallment_Policy_IdOrderByPaymentDateDesc(Long policyId);
 
-    List<PremiumPayment> findAllByInstallment_Policy_Id(UUID policyId);
+    List<PremiumPayment> findAllByInstallment_Policy_Id(Long policyId);
 }

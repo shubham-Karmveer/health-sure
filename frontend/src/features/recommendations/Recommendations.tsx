@@ -55,7 +55,7 @@ export default function Recommendations({ dateOfBirth, onRegister }: Recommendat
           Insurance goals or preferences
           <textarea
             id="recommendation-goals"
-            maxLength={2000}
+            maxLength={500}
             rows={3}
             value={insuranceGoals}
             onChange={(event) => setInsuranceGoals(event.target.value)}

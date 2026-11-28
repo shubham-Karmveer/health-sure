@@ -9,9 +9,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface InsuranceProductRepository extends JpaRepository<InsuranceProduct, UUID> {
+public interface InsuranceProductRepository extends JpaRepository<InsuranceProduct, Long> {
 
     Optional<InsuranceProduct> findByProductCode(String productCode);
 
@@ -29,7 +28,7 @@ public interface InsuranceProductRepository extends JpaRepository<InsuranceProdu
               )
             order by product.productCode
             """)
-    List<InsuranceProduct> findAvailableForCustomer(@Param("customerId") UUID customerId);
+    List<InsuranceProduct> findAvailableForCustomer(@Param("customerId") Long customerId);
 
     @Query("""
             select product from InsuranceProduct product
@@ -44,7 +43,7 @@ public interface InsuranceProductRepository extends JpaRepository<InsuranceProdu
             order by product.productCode
             """)
     List<InsuranceProduct> findEligibleAvailableForCustomer(
-            @Param("customerId") UUID customerId,
+            @Param("customerId") Long customerId,
             @Param("age") int age
     );
 
@@ -76,7 +75,7 @@ public interface InsuranceProductRepository extends JpaRepository<InsuranceProdu
                     """
     )
     Page<InsuranceProduct> searchAvailableForCustomer(
-            @Param("customerId") UUID customerId,
+            @Param("customerId") Long customerId,
             @Param("productCode") String productCode,
             @Param("policyName") String policyName,
             @Param("policyType") String policyType,

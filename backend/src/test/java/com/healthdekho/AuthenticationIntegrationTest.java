@@ -28,7 +28,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.auth.demo.email=customer@example.com",
+        "app.auth.demo.password=LocalTestPassword123!"
+})
 @AutoConfigureMockMvc
 @Transactional
 class AuthenticationIntegrationTest {
@@ -81,7 +84,7 @@ class AuthenticationIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 "Other Customer",
                 LocalDate.of(1988, 2, 10),
-                null,
+                "5550101",
                 "ACTIVE"
         ));
         InsuranceProduct otherProduct = productRepository.save(new InsuranceProduct(
@@ -170,7 +173,7 @@ class AuthenticationIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 "Test Customer",
                 LocalDate.of(1990, 4, 15),
-                null,
+                "5550101",
                 "ACTIVE"
         ));
         Cookie authCookie = loginAndGetAuthCookie();
@@ -188,7 +191,7 @@ class AuthenticationIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 "Test Customer",
                 LocalDate.of(1990, 4, 15),
-                null,
+                "5550101",
                 "ACTIVE"
         ));
         Cookie authCookie = loginAndGetAuthCookie();
@@ -214,7 +217,7 @@ class AuthenticationIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 "Test Customer",
                 LocalDate.of(1990, 4, 15),
-                null,
+                "5550101",
                 "ACTIVE"
         ));
 
@@ -230,6 +233,27 @@ class AuthenticationIntegrationTest {
 
         assertThat(result.getResponse().getCookie("HD_ACCESS_TOKEN")).isNull();
         assertThat(customerRepository.findById(customer.getId())).isPresent();
+    }
+
+    @Test
+    void onlyTheConfiguredDemoEmailCanUseTheConfiguredPassword() throws Exception {
+        customerRepository.save(new Customer(
+                "other@example.com",
+                passwordEncoder.encode(PASSWORD),
+                "Other Customer",
+                LocalDate.of(1990, 4, 15),
+                "5550101",
+                "ACTIVE"
+        ));
+        CsrfFixture csrf = getCsrfFixture();
+
+        mockMvc.perform(post("/api/auth/login")
+                        .cookie(csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(new LoginPayload("other@example.com", PASSWORD))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
     }
 
     private CsrfFixture getCsrfFixture() throws Exception {

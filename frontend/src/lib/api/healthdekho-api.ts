@@ -2,7 +2,7 @@ import axios from "axios";
 import apiClient from "./client";
 
 export interface CustomerProfile {
-  customerId: string;
+  customerId: number;
   email: string;
   fullName: string;
   dateOfBirth: string;
@@ -28,7 +28,7 @@ export interface DashboardData {
 }
 
 export interface AvailableProduct {
-  productId: string;
+  productId: number;
   productCode: string;
   policyName: string;
   policyType: string;
@@ -83,7 +83,7 @@ export interface RecommendationRequest {
 }
 
 export interface RecommendationItem {
-  productId: string;
+  productId: number;
   productCode: string;
   policyName: string;
   policyType: string;
@@ -98,15 +98,11 @@ export interface RecommendationItem {
 }
 
 export interface RecommendationResult {
-  requestId: string;
+  requestId: number | null;
   dateOfBirth: string;
   calculatedAge: number;
   insuranceGoals: string | null;
-  preferredTerm: string | null;
-  preferredPolicyType: string | null;
   modelName: string;
-  modelVersion: string;
-  promptVersion: string;
   requestedAt: string;
   recommendations: RecommendationItem[];
 }
@@ -258,7 +254,7 @@ export async function createRecommendation(
   return response.data;
 }
 
-export async function fetchRecommendation(requestId: string): Promise<RecommendationResult> {
+export async function fetchRecommendation(requestId: number): Promise<RecommendationResult> {
   const response = await apiClient.get<RecommendationResult>(
     `/api/recommendations/${encodeURIComponent(requestId)}`
   );

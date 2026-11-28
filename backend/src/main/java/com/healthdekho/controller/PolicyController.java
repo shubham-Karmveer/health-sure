@@ -29,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/policies")
@@ -55,7 +54,7 @@ public class PolicyController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody PolicyRegistrationRequest request
     ) {
-        return policyRegistrationService.register(UUID.fromString(jwt.getSubject()), request);
+        return policyRegistrationService.register(Long.valueOf(jwt.getSubject()), request);
     }
 
     @GetMapping("/{policyNumber}")
@@ -63,7 +62,7 @@ public class PolicyController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String policyNumber
     ) {
-        return policyPaymentService.getPolicyDetails(UUID.fromString(jwt.getSubject()), policyNumber);
+        return policyPaymentService.getPolicyDetails(Long.valueOf(jwt.getSubject()), policyNumber);
     }
 
     @GetMapping("/search")
@@ -76,7 +75,7 @@ public class PolicyController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return policySearchService.search(
-                UUID.fromString(jwt.getSubject()),
+                Long.valueOf(jwt.getSubject()),
                 policyNumber,
                 customerName,
                 dateOfBirth,
@@ -90,7 +89,7 @@ public class PolicyController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String policyNumber
     ) {
-        return policyPaymentService.getInstallments(UUID.fromString(jwt.getSubject()), policyNumber);
+        return policyPaymentService.getInstallments(Long.valueOf(jwt.getSubject()), policyNumber);
     }
 
     @GetMapping("/{policyNumber}/payments")
@@ -98,7 +97,7 @@ public class PolicyController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String policyNumber
     ) {
-        return policyPaymentService.getPaymentHistory(UUID.fromString(jwt.getSubject()), policyNumber);
+        return policyPaymentService.getPaymentHistory(Long.valueOf(jwt.getSubject()), policyNumber);
     }
 
     @PostMapping("/{policyNumber}/payments")
@@ -109,7 +108,7 @@ public class PolicyController {
             @Valid @RequestBody PaymentRequest request
     ) {
         return policyPaymentService.recordPayments(
-                UUID.fromString(jwt.getSubject()),
+                Long.valueOf(jwt.getSubject()),
                 policyNumber,
                 idempotencyKey,
                 request

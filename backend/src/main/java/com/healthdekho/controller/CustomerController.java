@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -24,11 +23,11 @@ public class CustomerController {
 
     @GetMapping("/customers/me")
     public CustomerResponse profile(@AuthenticationPrincipal Jwt jwt) {
-        return customerService.getProfile(UUID.fromString(jwt.getSubject()));
+        return customerService.getProfile(Long.valueOf(jwt.getSubject()));
     }
 
     @GetMapping("/me/policies")
     public List<PolicySummaryResponse> policies(@AuthenticationPrincipal Jwt jwt) {
-        return customerService.getPolicies(UUID.fromString(jwt.getSubject()));
+        return customerService.getPolicies(Long.valueOf(jwt.getSubject()));
     }
 }

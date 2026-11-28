@@ -13,18 +13,14 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(createRecommendation).mockResolvedValue({
-    requestId: "recommendation-1",
+    requestId: 1,
     dateOfBirth: "1990-04-15",
     calculatedAge: 36,
     insuranceGoals: "Family protection",
-    preferredTerm: "20 years",
-    preferredPolicyType: "TERM",
     modelName: "local-stub",
-    modelVersion: "v1",
-    promptVersion: "test",
     requestedAt: "2026-11-26T10:00:00Z",
     recommendations: [{
-      productId: "product-1",
+      productId: 1,
       productCode: "HD-TERM-001",
       policyName: "HealthDekho Secure Term",
       policyType: "TERM",

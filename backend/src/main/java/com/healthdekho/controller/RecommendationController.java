@@ -15,8 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/recommendations")
 public class RecommendationController {
@@ -33,14 +31,14 @@ public class RecommendationController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateRecommendationRequest request
     ) {
-        return recommendationService.create(UUID.fromString(jwt.getSubject()), request);
+        return recommendationService.create(Long.valueOf(jwt.getSubject()), request);
     }
 
     @GetMapping("/{requestId}")
     public RecommendationResponse get(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable UUID requestId
+            @PathVariable Long requestId
     ) {
-        return recommendationService.get(UUID.fromString(jwt.getSubject()), requestId);
+        return recommendationService.get(Long.valueOf(jwt.getSubject()), requestId);
     }
 }

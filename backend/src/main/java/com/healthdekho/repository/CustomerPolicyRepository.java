@@ -13,17 +13,16 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, UUID> {
+public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, Long> {
 
-    List<CustomerPolicy> findAllByCustomer_IdOrderByCreatedAtDesc(UUID customerId);
+    List<CustomerPolicy> findAllByCustomer_IdOrderByCreatedAtDesc(Long customerId);
 
-    boolean existsByCustomer_IdAndProduct_Id(UUID customerId, UUID productId);
+    boolean existsByCustomer_IdAndProduct_Id(Long customerId, Long productId);
 
     Optional<CustomerPolicy> findByPolicyNumber(String policyNumber);
 
-    Optional<CustomerPolicy> findByPolicyNumberAndCustomer_Id(String policyNumber, UUID customerId);
+    Optional<CustomerPolicy> findByPolicyNumberAndCustomer_Id(String policyNumber, Long customerId);
 
     @EntityGraph(attributePaths = {"customer", "product"})
     @Query("""
@@ -32,7 +31,7 @@ public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, 
               and policy.policyNumber = :policyNumber
             """)
     Page<CustomerPolicy> searchOwnedByPolicyNumber(
-            @Param("customerId") UUID customerId,
+            @Param("customerId") Long customerId,
             @Param("policyNumber") String policyNumber,
             Pageable pageable
     );
@@ -41,10 +40,10 @@ public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, 
     @Query("""
             select policy from CustomerPolicy policy
             where policy.customer.id = :customerId
-              and lower(policy.customer.fullName) like lower(concat('%', :customerName, '%'))
+              and lower(policy.customer.customerName) like lower(concat('%', :customerName, '%'))
             """)
     Page<CustomerPolicy> searchOwnedByCustomerName(
-            @Param("customerId") UUID customerId,
+            @Param("customerId") Long customerId,
             @Param("customerName") String customerName,
             Pageable pageable
     );
@@ -57,7 +56,7 @@ public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, 
               and policy.customer.dateOfBirth = :dateOfBirth
             """)
     Page<CustomerPolicy> searchOwnedByPolicyNumberAndDateOfBirth(
-            @Param("customerId") UUID customerId,
+            @Param("customerId") Long customerId,
             @Param("policyNumber") String policyNumber,
             @Param("dateOfBirth") LocalDate dateOfBirth,
             Pageable pageable
@@ -70,6 +69,6 @@ public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, 
             """)
     Optional<CustomerPolicy> findForUpdateByPolicyNumberAndCustomerId(
             @Param("policyNumber") String policyNumber,
-            @Param("customerId") UUID customerId
+            @Param("customerId") Long customerId
     );
 }

@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class RecommendationService {
@@ -33,7 +32,7 @@ public class RecommendationService {
         this.persistenceService = persistenceService;
     }
 
-    public RecommendationResponse create(UUID customerId, CreateRecommendationRequest request) {
+    public RecommendationResponse create(Long customerId, CreateRecommendationRequest request) {
         PreparedRecommendation prepared = preparationService.prepare(customerId, request);
         List<RecommendationProvider.Suggestion> suggestions;
         if (prepared.candidates().isEmpty()) {
@@ -64,7 +63,7 @@ public class RecommendationService {
         return persistenceService.save(customerId, prepared, provider.metadata(), suggestions);
     }
 
-    public RecommendationResponse get(UUID customerId, UUID requestId) {
+    public RecommendationResponse get(Long customerId, Long requestId) {
         return persistenceService.get(customerId, requestId);
     }
 }

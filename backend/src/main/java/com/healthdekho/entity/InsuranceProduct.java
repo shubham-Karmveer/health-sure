@@ -8,35 +8,35 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Entity
-@Table(name = "insurance_product")
+@Table(name = "insurance_products")
 public class InsuranceProduct {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "product_id")
+    private Long id;
 
-    @Column(name = "product_code", nullable = false, unique = true, length = 40)
+    @Column(name = "product_code", nullable = false, unique = true, length = 30)
     private String productCode;
 
-    @Column(name = "policy_name", nullable = false, length = 160)
+    @Column(name = "policy_name", nullable = false, length = 150)
     private String policyName;
 
-    @Column(name = "policy_type", nullable = false, length = 40)
+    @Column(name = "policy_type", nullable = false, length = 50)
     private String policyType;
 
-    @Column(name = "term_months", nullable = false)
-    private int termMonths;
+    @Column(name = "policy_term_years", nullable = false)
+    private int policyTermYears;
 
     @Column(name = "premium_frequency", nullable = false, length = 20)
     private String premiumFrequency;
 
-    @Column(name = "premium_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "premium_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal premiumAmount;
 
-    @Column(name = "sum_insured", nullable = false, precision = 19, scale = 2)
+    @Column(name = "sum_insured", nullable = false, precision = 15, scale = 2)
     private BigDecimal sumInsured;
 
     @Column(name = "min_entry_age", nullable = false)
@@ -57,7 +57,10 @@ public class InsuranceProduct {
         this.productCode = productCode;
         this.policyName = policyName;
         this.policyType = policyType;
-        this.termMonths = termMonths;
+        if (termMonths <= 0 || termMonths % 12 != 0) {
+            throw new IllegalArgumentException("Product terms must be a positive whole number of years.");
+        }
+        this.policyTermYears = termMonths / 12;
         this.premiumFrequency = premiumFrequency;
         this.premiumAmount = premiumAmount;
         this.sumInsured = sumInsured;
@@ -66,7 +69,7 @@ public class InsuranceProduct {
         this.active = active;
     }
 
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 
@@ -83,7 +86,7 @@ public class InsuranceProduct {
     }
 
     public int getTermMonths() {
-        return termMonths;
+        return policyTermYears * 12;
     }
 
     public String getPremiumFrequency() {

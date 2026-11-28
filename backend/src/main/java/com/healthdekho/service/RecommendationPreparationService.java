@@ -13,7 +13,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class RecommendationPreparationService {
@@ -30,7 +29,7 @@ public class RecommendationPreparationService {
     }
 
     @Transactional(readOnly = true)
-    public PreparedRecommendation prepare(UUID customerId, CreateRecommendationRequest request) {
+    public PreparedRecommendation prepare(Long customerId, CreateRecommendationRequest request) {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         LocalDate dateOfBirth = request.dateOfBirth() == null ? customer.getDateOfBirth() : request.dateOfBirth();

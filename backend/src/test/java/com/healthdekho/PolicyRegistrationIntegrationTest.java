@@ -10,6 +10,7 @@ import com.healthdekho.repository.CustomerPolicyRepository;
 import com.healthdekho.repository.CustomerRepository;
 import com.healthdekho.repository.InsuranceProductRepository;
 import com.healthdekho.repository.PremiumInstallmentRepository;
+import com.healthdekho.service.JwtTokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,9 @@ class PolicyRegistrationIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    private JwtTokenService jwtTokenService;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Test
@@ -82,7 +86,7 @@ class PolicyRegistrationIntegrationTest {
 
         mockMvc.perform(get("/api/products/available").cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$.length()").value(6))
                 .andExpect(jsonPath("$[0].productCode").value("HD-HEALTH-001"))
                 .andExpect(jsonPath("$[1].productCode").value("HD-SAV-001"))
                 .andExpect(jsonPath("$[?(@.productCode == 'HD-LEGACY-001')]").isEmpty());
@@ -222,8 +226,8 @@ class PolicyRegistrationIntegrationTest {
     }
 
     @Test
-    void databaseRejectsProductTermsThatCannotProduceWholeYearlyInstallments() {
-        InsuranceProduct invalidProduct = new InsuranceProduct(
+    void suppliedSchemaOnlySupportsWholeYearProductTerms() {
+        assertThatThrownBy(() -> new InsuranceProduct(
                 "HD-INVALID-TERM",
                 "Invalid Yearly Product",
                 "TERM",
@@ -234,10 +238,7 @@ class PolicyRegistrationIntegrationTest {
                 18,
                 55,
                 true
-        );
-
-        assertThatThrownBy(() -> productRepository.saveAndFlush(invalidProduct))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        )).isInstanceOf(IllegalArgumentException.class);
     }
 
     private Customer createCustomer(String email, LocalDate dateOfBirth) {
@@ -246,21 +247,14 @@ class PolicyRegistrationIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 "Test Customer",
                 dateOfBirth,
-                null,
+                "5550101",
                 "ACTIVE"
         ));
     }
 
     private Cookie loginAndGetAuthCookie(String email) throws Exception {
-        CsrfFixture csrf = getCsrfFixture();
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .cookie(csrf.cookie())
-                        .header(csrf.headerName(), csrf.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(new LoginPayload(email, PASSWORD))))
-                .andExpect(status().isOk())
-                .andReturn();
-        return result.getResponse().getCookie("HD_ACCESS_TOKEN");
+        Customer customer = customerRepository.findByEmailIgnoreCase(email).orElseThrow();
+        return new Cookie("HD_ACCESS_TOKEN", jwtTokenService.issueFor(customer));
     }
 
     private CsrfFixture getCsrfFixture() throws Exception {

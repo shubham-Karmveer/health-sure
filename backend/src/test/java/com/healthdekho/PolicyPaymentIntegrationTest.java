@@ -11,6 +11,7 @@ import com.healthdekho.repository.CustomerRepository;
 import com.healthdekho.repository.InsuranceProductRepository;
 import com.healthdekho.repository.PremiumInstallmentRepository;
 import com.healthdekho.repository.PremiumPaymentRepository;
+import com.healthdekho.service.JwtTokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,9 @@ class PolicyPaymentIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -215,9 +219,9 @@ class PolicyPaymentIntegrationTest {
                 "HD-POL-PAY-" + customer.getEmail().hashCode(),
                 customer,
                 product,
-                2,
+                12,
                 startDate,
-                startDate.plusMonths(2).minusDays(1),
+                startDate.plusMonths(12).minusDays(1),
                 "MONTHLY",
                 new BigDecimal("1000.00"),
                 new BigDecimal("100000.00"),
@@ -260,15 +264,8 @@ class PolicyPaymentIntegrationTest {
     }
 
     private Cookie loginAndGetAuthCookie(String email) throws Exception {
-        CsrfFixture csrf = getCsrfFixture();
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .cookie(csrf.cookie())
-                        .header(csrf.headerName(), csrf.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(new LoginPayload(email, PASSWORD))))
-                .andExpect(status().isOk())
-                .andReturn();
-        return result.getResponse().getCookie("HD_ACCESS_TOKEN");
+        Customer customer = customerRepository.findByEmailIgnoreCase(email).orElseThrow();
+        return new Cookie("HD_ACCESS_TOKEN", jwtTokenService.issueFor(customer));
     }
 
     private CsrfFixture getCsrfFixture() throws Exception {

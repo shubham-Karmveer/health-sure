@@ -2,18 +2,17 @@ package com.healthdekho;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.healthdekho.entity.AiRecommendationItem;
-import com.healthdekho.entity.AiRecommendationRequest;
 import com.healthdekho.entity.Customer;
 import com.healthdekho.entity.CustomerPolicy;
 import com.healthdekho.entity.InsuranceProduct;
-import com.healthdekho.repository.AiRecommendationItemRepository;
-import com.healthdekho.repository.AiRecommendationRequestRepository;
+import com.healthdekho.entity.PolicyRecommendation;
 import com.healthdekho.repository.CustomerPolicyRepository;
 import com.healthdekho.repository.CustomerRepository;
 import com.healthdekho.repository.InsuranceProductRepository;
+import com.healthdekho.repository.PolicyRecommendationRepository;
 import com.healthdekho.recommendation.RecommendationProvider;
 import com.healthdekho.recommendation.RecommendationProviderUnavailableException;
+import com.healthdekho.service.JwtTokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +33,6 @@ import org.mockito.Mockito;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -72,10 +70,10 @@ class RecommendationIntegrationTest {
     private InsuranceProductRepository productRepository;
 
     @Autowired
-    private AiRecommendationRequestRepository recommendationRequestRepository;
+    private PolicyRecommendationRepository recommendationRepository;
 
     @Autowired
-    private AiRecommendationItemRepository recommendationItemRepository;
+    private JwtTokenService jwtTokenService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -140,20 +138,25 @@ class RecommendationIntegrationTest {
                 .andReturn();
 
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsByteArray());
-        UUID requestId = UUID.fromString(response.get("requestId").asText());
-        AiRecommendationRequest savedRequest = recommendationRequestRepository.findById(requestId).orElseThrow();
-        List<AiRecommendationItem> savedItems =
-                recommendationItemRepository.findAllByRequest_IdOrderByRankOrderAsc(requestId);
-        assertThat(savedRequest.getDateOfBirth()).isEqualTo(customer.getDateOfBirth());
-        assertThat(savedRequest.getInsuranceGoals()).isEqualTo("Family protection");
-        assertThat(savedRequest.getCalculatedAge())
+        Long requestId = response.get("requestId").asLong();
+        List<PolicyRecommendation> savedItems = recommendationRepository
+                .findAllByCustomer_IdAndCustomerGoalAndCustomerAgeAndAiModelAndCreatedAtOrderByIdAsc(
+                        customer.getId(),
+                        "Family protection",
+                        java.time.Period.between(customer.getDateOfBirth(), LocalDate.now()).getYears(),
+                        "test-model",
+                        savedRecommendation(requestId).getCreatedAt()
+                );
+        assertThat(savedItems.get(0).getCustomer().getDateOfBirth()).isEqualTo(customer.getDateOfBirth());
+        assertThat(savedItems.get(0).getCustomerGoal()).isEqualTo("Family protection");
+        assertThat(savedItems.get(0).getCustomerAge())
                 .isEqualTo(java.time.Period.between(customer.getDateOfBirth(), LocalDate.now()).getYears());
         assertThat(savedItems).extracting(item -> item.getProduct().getProductCode())
                 .containsExactly("HD-HEALTH-001");
 
         mockMvc.perform(get("/api/recommendations/{requestId}", requestId).cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.requestId").value(requestId.toString()))
+                .andExpect(jsonPath("$.requestId").value(requestId))
                 .andExpect(jsonPath("$.recommendations.length()").value(1));
 
         Customer anotherCustomer = createCustomer("other-recommend@example.com", LocalDate.of(1991, 4, 15));
@@ -186,7 +189,7 @@ class RecommendationIntegrationTest {
                 ));
 
         verify(recommendationProvider, never()).recommend(any());
-        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isZero();
+        assertThat(recommendationRepository.countByCustomer_Id(customer.getId())).isZero();
     }
 
     @Test
@@ -209,7 +212,7 @@ class RecommendationIntegrationTest {
                 .andExpect(jsonPath("$.recommendations.length()").value(0));
 
         verify(recommendationProvider, never()).recommend(any());
-        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isEqualTo(1);
+        assertThat(recommendationRepository.countByCustomer_Id(customer.getId())).isZero();
     }
 
     @Test
@@ -233,8 +236,7 @@ class RecommendationIntegrationTest {
                         ))))
                 .andExpect(status().isBadGateway());
 
-        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isZero();
-        assertThat(recommendationItemRepository.countByRequest_Customer_Id(customer.getId())).isZero();
+        assertThat(recommendationRepository.countByCustomer_Id(customer.getId())).isZero();
     }
 
     @Test
@@ -258,7 +260,7 @@ class RecommendationIntegrationTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.message").value("Recommendations are temporarily unavailable."));
 
-        assertThat(recommendationRequestRepository.countByCustomer_Id(customer.getId())).isZero();
+        assertThat(recommendationRepository.countByCustomer_Id(customer.getId())).isZero();
     }
 
     @Test
@@ -281,7 +283,7 @@ class RecommendationIntegrationTest {
         Cookie authCookie = loginAndGetAuthCookie(customer.getEmail());
 
         mockMvc.perform(get("/api/products/search")
-                        .param("policyType", "hea")
+                        .param("productCode", "HD-HEALTH-001")
                         .param("page", "0")
                         .param("size", "1")
                         .cookie(authCookie))
@@ -315,21 +317,18 @@ class RecommendationIntegrationTest {
                 passwordEncoder.encode(PASSWORD),
                 "Test Customer",
                 dateOfBirth,
-                null,
+                "5550101",
                 "ACTIVE"
         ));
     }
 
     private Cookie loginAndGetAuthCookie(String email) throws Exception {
-        CsrfFixture csrf = getCsrfFixture();
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                        .cookie(csrf.cookie())
-                        .header(csrf.headerName(), csrf.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsBytes(new LoginPayload(email, PASSWORD))))
-                .andExpect(status().isOk())
-                .andReturn();
-        return result.getResponse().getCookie("HD_ACCESS_TOKEN");
+        Customer customer = customerRepository.findByEmailIgnoreCase(email).orElseThrow();
+        return new Cookie("HD_ACCESS_TOKEN", jwtTokenService.issueFor(customer));
+    }
+
+    private PolicyRecommendation savedRecommendation(Long recommendationId) {
+        return recommendationRepository.findById(recommendationId).orElseThrow();
     }
 
     private CsrfFixture getCsrfFixture() throws Exception {

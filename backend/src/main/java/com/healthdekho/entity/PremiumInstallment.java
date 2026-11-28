@@ -8,19 +8,23 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "premium_installment")
+@Table(name = "premium_installments")
 public class PremiumInstallment {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "installment_id")
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "policy_id", nullable = false)
@@ -35,20 +39,26 @@ public class PremiumInstallment {
     @Column(name = "grace_period_end_date", nullable = false)
     private LocalDate gracePeriodEndDate;
 
-    @Column(name = "scheduled_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "premium_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal scheduledAmount;
 
-    @Column(name = "paid_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "amount_paid", precision = 15, scale = 2)
     private BigDecimal paidAmount;
 
-    @Column(name = "penalty_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "penalty_amount", precision = 15, scale = 2)
     private BigDecimal penaltyAmount;
-
-    @Column(name = "paid_penalty_amount", nullable = false, precision = 19, scale = 2)
-    private BigDecimal paidPenaltyAmount;
 
     @Column(name = "payment_status", nullable = false, length = 20)
     private String paymentStatus;
+
+    @OneToMany(mappedBy = "installment")
+    private List<PremiumPayment> payments = new ArrayList<>();
+
+    @Transient
+    private BigDecimal pendingPremiumPaid = BigDecimal.ZERO.setScale(2);
+
+    @Transient
+    private BigDecimal pendingPenaltyPaid = BigDecimal.ZERO.setScale(2);
 
     protected PremiumInstallment() {
     }
@@ -67,29 +77,29 @@ public class PremiumInstallment {
         this.scheduledAmount = scheduledAmount;
         this.paidAmount = BigDecimal.ZERO.setScale(2);
         this.penaltyAmount = BigDecimal.ZERO.setScale(2);
-        this.paidPenaltyAmount = BigDecimal.ZERO.setScale(2);
         this.paymentStatus = "PENDING";
     }
 
     public void assessPenalty(BigDecimal amount) {
-        if (penaltyAmount.signum() != 0) {
+        if (getPenaltyAmount().signum() != 0) {
             throw new IllegalStateException("A penalty has already been assessed for this installment.");
         }
         penaltyAmount = amount;
     }
 
     public void applyPayment(BigDecimal premiumAmount, BigDecimal penaltyAmount) {
-        paidAmount = paidAmount.add(premiumAmount);
-        paidPenaltyAmount = paidPenaltyAmount.add(penaltyAmount);
+        paidAmount = getTotalPaidAmount().add(premiumAmount).add(penaltyAmount);
+        pendingPremiumPaid = pendingPremiumPaid.add(premiumAmount);
+        pendingPenaltyPaid = pendingPenaltyPaid.add(penaltyAmount);
     }
 
     public void updatePaymentStatus(LocalDate today) {
-        if (paidAmount.compareTo(scheduledAmount) >= 0
-                && paidPenaltyAmount.compareTo(penaltyAmount) >= 0) {
+        if (getPaidAmount().compareTo(scheduledAmount) >= 0
+                && getPaidPenaltyAmount().compareTo(getPenaltyAmount()) >= 0) {
             paymentStatus = "PAID";
         } else if (today.isAfter(gracePeriodEndDate)) {
             paymentStatus = "OVERDUE";
-        } else if (paidAmount.signum() > 0 || paidPenaltyAmount.signum() > 0) {
+        } else if (getPaidAmount().signum() > 0 || getPaidPenaltyAmount().signum() > 0) {
             paymentStatus = "PARTIALLY_PAID";
         } else {
             paymentStatus = "PENDING";
@@ -98,6 +108,10 @@ public class PremiumInstallment {
 
     public int getInstallmentNumber() {
         return installmentNumber;
+    }
+
+    public CustomerPolicy getPolicy() {
+        return policy;
     }
 
     public LocalDate getDueDate() {
@@ -113,15 +127,23 @@ public class PremiumInstallment {
     }
 
     public BigDecimal getPaidAmount() {
-        return paidAmount;
+        return payments.stream()
+                .map(PremiumPayment::getPremiumAmount)
+                .reduce(pendingPremiumPaid, BigDecimal::add);
+    }
+
+    public BigDecimal getTotalPaidAmount() {
+        return paidAmount == null ? BigDecimal.ZERO.setScale(2) : paidAmount;
     }
 
     public BigDecimal getPenaltyAmount() {
-        return penaltyAmount;
+        return penaltyAmount == null ? BigDecimal.ZERO.setScale(2) : penaltyAmount;
     }
 
     public BigDecimal getPaidPenaltyAmount() {
-        return paidPenaltyAmount;
+        return payments.stream()
+                .map(PremiumPayment::getPenaltyAmount)
+                .reduce(pendingPenaltyPaid, BigDecimal::add);
     }
 
     public String getPaymentStatus() {

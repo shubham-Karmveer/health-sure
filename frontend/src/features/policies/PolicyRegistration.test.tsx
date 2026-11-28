@@ -34,7 +34,7 @@ vi.mock("@/lib/api/healthdekho-api", () => ({
 afterEach(cleanup);
 
 const product = {
-  productId: "product-1",
+  productId: 1,
   productCode: "HD-TERM-001",
   policyName: "HealthDekho Secure Term",
   policyType: "TERM",
@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(fetchDashboard).mockResolvedValue({
     customer: {
-      customerId: "customer-1",
+      customerId: 1,
       email: "customer@example.com",
       fullName: "Test Customer",
       dateOfBirth: "1990-04-15",

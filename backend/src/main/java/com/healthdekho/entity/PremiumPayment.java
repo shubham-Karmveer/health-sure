@@ -12,62 +12,57 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.UUID;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "premium_payment")
+@Table(name = "premium_payments")
 public class PremiumPayment {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "payment_id")
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "installment_id", nullable = false)
     private PremiumInstallment installment;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "idempotency_id", nullable = false)
-    private PaymentIdempotencyRecord idempotencyRecord;
+    @Column(name = "receipt_number", nullable = false, length = 50)
+    private String receiptNumber;
 
-    @Column(name = "transaction_reference", nullable = false, unique = true, length = 60)
+    @Column(name = "transaction_reference", unique = true, length = 100)
     private String transactionReference;
 
-    @Column(name = "amount_paid", nullable = false, precision = 19, scale = 2)
-    private BigDecimal amountPaid;
-
-    @Column(name = "premium_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "premium_paid", nullable = false, precision = 15, scale = 2)
     private BigDecimal premiumAmount;
 
-    @Column(name = "penalty_amount", nullable = false, precision = 19, scale = 2)
+    @Column(name = "penalty_paid", precision = 15, scale = 2)
     private BigDecimal penaltyAmount;
 
-    @Column(name = "payment_method", nullable = false, length = 40)
+    @Column(name = "payment_method", length = 30)
     private String paymentMethod;
 
     @Column(name = "payment_date", nullable = false)
-    private Instant paymentDate;
+    private LocalDate paymentDate;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     protected PremiumPayment() {
     }
 
     public PremiumPayment(
             PremiumInstallment installment,
-            PaymentIdempotencyRecord idempotencyRecord,
+            String receiptNumber,
             String transactionReference,
-            BigDecimal amountPaid,
             BigDecimal premiumAmount,
             BigDecimal penaltyAmount,
             String paymentMethod
     ) {
         this.installment = installment;
-        this.idempotencyRecord = idempotencyRecord;
+        this.receiptNumber = receiptNumber;
         this.transactionReference = transactionReference;
-        this.amountPaid = amountPaid;
         this.premiumAmount = premiumAmount;
         this.penaltyAmount = penaltyAmount;
         this.paymentMethod = paymentMethod;
@@ -75,9 +70,8 @@ public class PremiumPayment {
 
     @PrePersist
     void onCreate() {
-        createdAt = Instant.now();
         if (paymentDate == null) {
-            paymentDate = createdAt;
+            paymentDate = LocalDate.now();
         }
     }
 
@@ -86,7 +80,7 @@ public class PremiumPayment {
     }
 
     public BigDecimal getAmountPaid() {
-        return amountPaid;
+        return premiumAmount.add(penaltyAmount == null ? BigDecimal.ZERO : penaltyAmount);
     }
 
     public BigDecimal getPremiumAmount() {
@@ -94,18 +88,26 @@ public class PremiumPayment {
     }
 
     public BigDecimal getPenaltyAmount() {
-        return penaltyAmount;
+        return penaltyAmount == null ? BigDecimal.ZERO.setScale(2) : penaltyAmount;
     }
 
     public String getPaymentMethod() {
         return paymentMethod;
     }
 
-    public Instant getPaymentDate() {
+    public LocalDate getPaymentDate() {
         return paymentDate;
+    }
+
+    public String getReceiptNumber() {
+        return receiptNumber;
     }
 
     public int getInstallmentNumber() {
         return installment.getInstallmentNumber();
+    }
+
+    public Long getInstallmentPolicyId() {
+        return installment.getPolicy().getId();
     }
 }
